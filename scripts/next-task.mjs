@@ -1428,10 +1428,7 @@ export function run(argv) {
     ? "nothing to take now — plan wave " + (activeWave.index + 1) + " " + waitingPhrase(waiting.kind)
     : "nothing to take";
   if (waiting && waiting.kind) {
-    const lines = [];
-    if (waiting.claimed.length) lines.push("claimed in another tree or session: " + waiting.claimed.join(", "));
-    if (waiting.awaitingMerge.length) lines.push("closed on a branch not merged here: " + waiting.awaitingMerge.join(", "));
-    if (waiting.behind.length) lines.push("blocked only by those: " + waiting.behind.join(", "));
+    const lines = waitingIds(waiting);
     lines.push(waiting.kind === WAVE_AWAITS_MERGE
       ? "ask again after the merge"
       : "ask again when those claims are closed and merged" +
@@ -1464,11 +1461,25 @@ export function run(argv) {
   return EXIT_NOTHING_TO_TAKE;
 }
 
-/** The clause a waiting wave is described by, in the refusal and the spill line. */
-function waitingPhrase(kind) {
+/** The clause a waiting wave is described by, in the refusal and the spill line
+ *  — and in `run --plan`'s stop sentence, which reuses it rather than a copy. */
+export function waitingPhrase(kind) {
   return kind === WAVE_AWAITS_MERGE
     ? "is waiting on a merge"
     : "is waiting on claims held in another tree or session";
+}
+
+/** The ids a waiting wave waits on, one line per kind that has any. PURE.
+ *  The refusal's details and `run --plan`'s stop sentence (TL-707) both name
+ *  them in these words, so the two cannot describe one wave differently.
+ *  @param {{claimed?: string[], awaitingMerge?: string[], behind?: string[]}} waiting */
+export function waitingIds(waiting) {
+  const lines = [];
+  const named = (label, ids) => { if ((ids || []).length) lines.push(label + ": " + ids.join(", ")); };
+  named("claimed in another tree or session", waiting.claimed);
+  named("closed on a branch not merged here", waiting.awaitingMerge);
+  named("blocked only by those", waiting.behind);
+  return lines;
 }
 
 /**

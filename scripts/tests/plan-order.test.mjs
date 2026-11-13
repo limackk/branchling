@@ -432,7 +432,10 @@ test("a run that stops on a wave somebody else holds names the wave", () => {
     cli(["run", "--dir", f.backlog, "--plan", "--agent", "true", "--actor", "agent:mine", "--json"], f.env)
   );
   assert.match(stopped, /plan wave 1 \(Foundations\)/);
-  assert.match(stopped, /1 of 1 task in it is still open/);
+  // A wave whose open work is all claimed is WAITING (TL-683), and the run
+  // names `next`'s kind and the claimed id rather than the counts (TL-707).
+  assert.match(stopped, new RegExp("is waiting on claims held in another tree or session \\(wave-claimed-elsewhere\\)" +
+    " — claimed in another tree or session: " + f.ids.early));
   assert.doesNotMatch(stopped, /the queue is empty/);
   // The wave 2 task is open and this run stepped over it. It is NOT unscheduled
   // — the plan schedules it later — so the sentence must not say it is (TL-219).
