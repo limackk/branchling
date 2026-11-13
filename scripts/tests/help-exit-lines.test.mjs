@@ -38,10 +38,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { COMMANDS, commandHelpText } from "../cli.mjs";
-import { USAGE as AUDIT_USAGE } from "../audit.mjs";
-import { USAGE as DOCS_DRIFT_USAGE } from "../docs-drift.mjs";
-import { USAGE as PR_SUMMARY_USAGE } from "../pr-summary.mjs";
-import { USAGE as SEED_ADAPTER_USAGE } from "../seed-adapter.mjs";
 import {
   BACKLOG_DIR_REFUSAL_EXIT,
   BACKLOG_DIR_REFUSAL_HELP,
@@ -173,25 +169,40 @@ for (const [name, spec] of Object.entries(EXEMPT)) {
 }
 
 /**
- * The help a script carries for when it is run outside the dispatcher, keyed
- * by the command table entry that dispatches to it. A script whose USAGE is
- * only exported is judged by that constant; one that prints it on `--help` is
- * run, so the text judged is the text printed (TL-659, TL-695).
+ * The help a script prints when it is run outside the dispatcher, keyed by the
+ * command table entry that dispatches to it. Every script is run, so the text
+ * judged is the text printed (TL-659, TL-695). The first four used to be judged
+ * by their exported USAGE constant, which nothing printed: run directly, each
+ * answered `--help` with `unknown flag:` and exit 2 (TL-720).
  */
 function directHelpTexts() {
-  const direct = {
-    audit: { where: "audit.mjs USAGE", text: AUDIT_USAGE },
-    "docs-drift": { where: "docs-drift.mjs USAGE", text: DOCS_DRIFT_USAGE },
-    "pr-summary": { where: "pr-summary.mjs USAGE", text: PR_SUMMARY_USAGE },
-    "plan-from": { where: "seed-adapter.mjs USAGE", text: SEED_ADAPTER_USAGE },
-  };
-  for (const [command, script] of [["renumber", "renumber.mjs"], ["query", "query.mjs"], ["doctor", "doctor.mjs"], ["migrate-prefix", "migrate-prefix.mjs"]]) {
+  const direct = {};
+  for (const [command, script] of [
+    ["audit", "audit.mjs"], ["docs-drift", "docs-drift.mjs"], ["pr-summary", "pr-summary.mjs"], ["plan-from", "seed-adapter.mjs"],
+    ["renumber", "renumber.mjs"], ["query", "query.mjs"], ["doctor", "doctor.mjs"], ["migrate-prefix", "migrate-prefix.mjs"],
+  ]) {
     const r = spawnSync(process.execPath, [join(SCRIPTS_DIR, script), "--help"], { encoding: "utf8", timeout: 30_000 });
     assert.equal(r.status, 0, script + " --help: " + r.stderr);
     direct[command] = { where: script + " --help", text: r.stdout };
   }
   return direct;
 }
+
+// `-h`, and a help flag beside any other token, are answered as the dispatcher's
+// wantsHelp() answers them: help wins over the rest of the line, so a reader who
+// appends `--help` to a command that failed gets the help, not the same refusal.
+test("a script run directly answers -h, and --help beside other flags, with its help", () => {
+  for (const script of ["audit.mjs", "docs-drift.mjs", "pr-summary.mjs", "seed-adapter.mjs"]) {
+    const run = (...args) => spawnSync(process.execPath, [join(SCRIPTS_DIR, script), ...args], { encoding: "utf8", timeout: 30_000 });
+    const long = run("--help");
+    assert.ok(long.stdout.trim(), script + " --help printed nothing");
+    for (const args of [["-h"], ["--no-such-flag", "--help"]]) {
+      const r = run(...args);
+      assert.equal(r.status, 0, script + " " + args.join(" ") + ": " + r.stderr);
+      assert.equal(r.stdout, long.stdout, script + " " + args.join(" ") + " and --help print different text");
+    }
+  }
+});
 
 /** The exit codes an exit block names, sorted and NOT deduplicated: each one
  *  opens a segment after `exit:`, `·` or `,` — `0 clean · 1 findings` and

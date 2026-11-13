@@ -401,6 +401,12 @@ function readTaskHead(file) {
 
 export function main(argv) {
   const cli = takeDirFlag(argv);
+  // Run directly, the script answers `--help` itself; through the dispatcher
+  // the command table's entry is printed before this is ever spawned (TL-720).
+  if (cli.argv.some((a) => a === "--help" || a === "-h")) {
+    console.log(USAGE);
+    return 0;
+  }
   let opts;
   try {
     opts = parsePrSummaryArgs(cli.argv);
