@@ -1256,6 +1256,35 @@ test("--keep-report copies the report, and a destination that cannot hold it is 
   }
 });
 
+test("--keep-report refuses a destination that is an existing directory before the run (TL-717)", async () => {
+  const root = fixture();
+  try {
+    mkdirSync(join(root, "out"));
+    const { deps, calls } = costDeps({ mutants: 4, seconds: 1 });
+    deps.runStryker = () => {
+      calls.stryker++;
+      return { code: 0, leftovers: [], report: REPORT, kept: null };
+    };
+    for (const [arg, dir] of [["out/", join(root, "out")], ["out", join(root, "out")], [".", root]]) {
+      const refused = await inProcess(["--files", "scripts/lib.mjs", "--keep-report", arg], root, deps);
+      assert.equal(refused.code, 1, "--keep-report " + arg + " was not refused");
+      assert.deepEqual(refused.err.replace(/^\S+ /, "").split("\n"), [
+        "node scripts/mutation-run.mjs: --keep-report " + dir + " is a directory",
+        "  The flag names the report's own file, and a copy onto a directory fails only after the run, so the run is not started.",
+      ]);
+    }
+    assert.equal(calls.stryker, 0, "a directory as --keep-report started Stryker");
+    assert.deepEqual(calls.timed, [], "a refused --keep-report went on to time the suite");
+
+    // Positive control: a file inside that directory is accepted and the run starts.
+    const accepted = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--keep-report", "out/m.json"], root, deps);
+    assert.equal(accepted.code, 0, accepted.err);
+    assert.equal(calls.stryker, 1, "a file inside an existing directory was refused");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("--budget takes a positive integer", () => {
   for (const value of ["0", "-3", "1.5", "lots"]) {
     const r = run(HOME, ["--budget", value]);
