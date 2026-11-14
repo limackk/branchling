@@ -126,7 +126,8 @@ export const KINDS = {
     // `{count, ids}` of the tasks another tree of this clone holds open, read
     // from the last "nothing to take" answer (TL-491).
     heldInOtherTrees: null,
-    // `{kind, wave, name, claimedElsewhere, awaitingMerge, waitingBehind}` of
+    // `{kind, wave, name, claimedElsewhere, awaitingMerge, waitingBehind,
+    // waitingConflict}` of
     // the wave the run stopped on when `next --plan` called it waiting
     // (TL-729): `kind` is `wave-claimed-elsewhere` or `wave-awaits-merge`, and
     // `wave` the waiting one even under `--spill`. Null when the run ran
@@ -386,8 +387,9 @@ export const KINDS = {
     // flag was not given — a wave number of 0 would say a plan was consulted.
     // Exit 3 under `--plan` is `refusalKind` `nothing-to-take`,
     // `wave-claimed-elsewhere` or `wave-awaits-merge` (TL-683); on that answer
-    // `plan` also carries `claimedElsewhere`, `awaitingMerge` and
-    // `waitingBehind`, the ids of the active wave each kind was judged from.
+    // `plan` also carries `claimedElsewhere`, `awaitingMerge`, `waitingBehind`
+    // and `waitingConflict` (TL-734), the ids of the active wave each kind was
+    // judged from.
     // `plan.spill` is null unless `--spill` looked past a waiting wave.
     plan: null,
     // `next --dry-run` (TL-644): true when the answer is a projection and
