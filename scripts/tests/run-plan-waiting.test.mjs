@@ -42,6 +42,10 @@
  *                           calls that wave waiting. A blocked task the
  *                           run's roles never serve does not make the wave
  *                           waiting (TL-743), as it does not for `next`.
+ *                           A task held back only by a conflict group that
+ *                           waiting work in its own wave holds makes the wave
+ *                           waiting, and one held by a task outside the wave
+ *                           does not (TL-744), as for `next`.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -581,6 +585,72 @@ test("run --dry-run --spill judges a blocked wave task by the roles the run serv
   });
   assert.deepEqual(review.order.map((r) => [r.id, r.wave]), [[f.ids.c, 2]]);
   assert.equal(review.stoppedAt, null, JSON.stringify(review.stoppedAt));
+});
+
+test("run --dry-run --spill judges a conflict-group hold as next --plan --spill does", () => {
+  // a is claimed under another actor and holds group g; b is pending in g, so
+  // the selection holds b back. The holder sits in b's own wave and waits.
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a", "b"]], ["Second", ["c"]]]);
+      setField(t.backlog, t.ids.a, "conflict_group", "[g]");
+      setField(t.backlog, t.ids.b, "conflict_group", "[g]");
+    },
+  });
+  const live = JSON.parse(cli(["next", "--dir", f.backlog, "--actor", RUN_ACTOR, "--plan", "--spill",
+    "--dry-run", "--json"], f.env).out);
+  assert.equal(live.plan.spill.refusalKind, "wave-claimed-elsewhere", JSON.stringify(live.plan));
+  assert.equal(live.plan.spill.from, 1);
+  assert.equal(live.task.id, f.ids.c, "the fixture is not the case it claims");
+
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.spill, {
+    from: 1, fromName: "First", refusalKind: "wave-claimed-elsewhere",
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], wave: 2, name: "Second",
+  });
+  assert.deepEqual(report.order.map((r) => [r.id, r.wave]), [[f.ids.c, 2]]);
+  assert.equal(report.stoppedAt, null, JSON.stringify(report.stoppedAt));
+});
+
+test("run --dry-run --spill: a task behind a conflict-held one is not this run's to close", () => {
+  // b waits with wave 1 because its group is held there; c, blocked by b, is
+  // stranded with it, so the projection stops at wave 2 instead of counting c.
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a", "b"]], ["Second", ["c"]]]);
+      setField(t.backlog, t.ids.a, "conflict_group", "[g]");
+      setField(t.backlog, t.ids.b, "conflict_group", "[g]");
+      setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.b + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.equal(report.spill.wave, 2, JSON.stringify(report.spill));
+  assert.deepEqual(report.order, []);
+  assert.deepEqual([report.stoppedAt.wave, report.stoppedAt.open, report.stoppedAt.left], [2, 1, 1]);
+});
+
+test("run --dry-run --spill stops at a wave whose conflict group is held outside it, as next does", () => {
+  // The holder a is in progress in wave 2, so nothing in wave 1 waits on it:
+  // `next` calls wave 1 nothing-to-take, and the projection must not spill.
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["b"]], ["Second", ["a", "c"]]]);
+      setField(t.backlog, t.ids.a, "conflict_group", "[g]");
+      setField(t.backlog, t.ids.b, "conflict_group", "[g]");
+    },
+  });
+  const live = JSON.parse(cli(["next", "--dir", f.backlog, "--actor", RUN_ACTOR, "--plan", "--spill",
+    "--dry-run", "--json"], f.env).out);
+  assert.equal(live.refusalKind, "nothing-to-take", "the fixture is not the case it claims: " + JSON.stringify(live));
+  assert.equal(live.plan.wave, 1);
+
+  const report = dryJson(f, ["--spill"]);
+  assert.equal(report.spill, null, JSON.stringify(report.spill));
+  assert.deepEqual(report.order, []);
+  assert.equal(report.stoppedAt.wave, 1, JSON.stringify(report.stoppedAt));
 });
 
 test("run --dry-run --spill: a chain inside the spill wave is reachable when its head is free", () => {

@@ -2069,9 +2069,12 @@ export async function run(argv) {
         // size never serve does not make the wave waiting. It is taken from
         // the tree as read, not from `closedByRun`: that view only closes
         // tasks, and admission reads a task's own status and fields, so every
-        // task still open in the view is admitted exactly as it was.
+        // task still open in the view is admitted exactly as it was. The
+        // conflict-group holds are this wave's `skippedConflict`, as `next`
+        // passes its active wave's (TL-744); a holder `closedByRun` closes is
+        // judged in that view, so it no longer counts as waiting work.
         if (plan.spill && !spill) {
-          const waiting = waveWaiting(w.tasks.map((e) => e.id), closedByRun(planIds), config, [], [], admitted);
+          const waiting = waveWaiting(w.tasks.map((e) => e.id), closedByRun(planIds), config, [], skippedConflict, admitted);
           if (waiting.kind) {
             const later = state.waves.find((x) => x.index > w.index && x.open > 0) || null;
             spill = {
@@ -2079,7 +2082,7 @@ export async function run(argv) {
               claimedElsewhere: waiting.claimed, awaitingMerge: waiting.awaitingMerge,
               wave: later ? later.index + 1 : null, name: later ? later.name : "",
             };
-            for (const id of [...waiting.claimed, ...waiting.awaitingMerge, ...waiting.behind]) {
+            for (const id of [...waiting.claimed, ...waiting.awaitingMerge, ...waiting.behind, ...waiting.conflict]) {
               stranded.add(String(id).toUpperCase());
             }
             wall = null;
