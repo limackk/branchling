@@ -8,8 +8,8 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P2
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-1
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
@@ -44,5 +44,5 @@ Measured on 2026-11-14 after run wf_5282982e-9c1 (three supervised loops, 13 tas
 
 ## Acceptance criteria
 
-- [ ] a full suite run leaves no branchling-* directory in its TMPDIR [proof: suite-leaves-nothing]
-- [ ] a guard test, with a positive control, fails when a fixture-making process (also one stopped by SIGTERM) leaves a directory behind [proof: guard-test]
+- [x] a full suite run leaves no branchling-* directory in its TMPDIR [proof: suite-leaves-nothing]
+- [x] a guard test, with a positive control, fails when a fixture-making process (also one stopped by SIGTERM) leaves a directory behind [proof: guard-test]
