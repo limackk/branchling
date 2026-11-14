@@ -28,11 +28,13 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 import { ALLOW_MARKER, auditText, auditTree, PUBLIC_DOCS, HISTORICAL_RECORD } from "../check-no-foreign-context.mjs";
 import { REPO_ROOT, isolateHome } from "./_repo.mjs";
+import { fixtureDir } from "./_fixture-dir.mjs";
 
 isolateHome("foreign-context");
 
@@ -227,4 +229,120 @@ test("the detectors that name somebody run EVERYWHERE, the record included", () 
     ["personal-path"]);
   assert.deepEqual(auditText("- 2026-09-01 — measured in northwind", ["northwind"], opts).map((p) => p.reason),
     ["word:northwind"]);
+});
+
+// ── what a finding says, and the tree it is drawn from (TL-739) ───────────
+//
+// The tests above assert WHICH rule fired. These assert what a reader of the
+// report is handed — the line number, the text and the file — and which files
+// the walk reads, each decided by a fixture the test writes rather than by
+// the contents of this repository.
+//
+// Named as equivalent, not killed, in a mutation run of lines 123-216: the
+// `["Stryker was here"]` defaults of `words` in `auditText` and `auditTree`,
+// the same placeholder for `(words || [])`, and `"Stryker was here!"` for the
+// `String(text || "")` fallback. Each differs from the code only for a text
+// that literally contains Stryker's placeholder, which is not a property of
+// the guard (the precedent is viewer-field-editors.test.mjs).
+
+test("a finding carries the 1-based line and the trimmed text, one finding per line", () => {
+  const doc = [
+    "  Northwind keeps its notes in /home/jane/notes  ",
+    "",
+    "  Write to jane@company.io  ",
+    "  See /home/jane/workspace  ",
+    "  The backlog holds 1362 tasks  ",
+    "  78% of commits touched views  ",
+  ].join("\n");
+  const found = auditText(doc, ["northwind"]);
+  assert.ok(found.length <= doc.split("\n").length * 2, "the audit reported " + found.length + " findings");
+  assert.deepEqual(found, [
+    // The word wins, and the personal path on the SAME line is not a second
+    // finding: one line is one entry in the report.
+    { line: 1, text: "Northwind keeps its notes in /home/jane/notes", reason: "word:northwind" },
+    // Line 3 sits two below a finding: the one-finding-per-line rule is about
+    // the line itself, not its neighbours.
+    { line: 3, text: "Write to jane@company.io", reason: "email" },
+    { line: 4, text: "See /home/jane/workspace", reason: "personal-path" },
+    { line: 5, text: "The backlog holds 1362 tasks", reason: "measurement" },
+    { line: 6, text: "78% of commits touched views", reason: "measurement" },
+  ]);
+});
+
+test("a forbidden word is matched literally, and only as a whole word", () => {
+  // A configured word is a name, not a pattern: its `.` is a dot.
+  assert.deepEqual(reasons("Built on node.js today.", ["node.js"]), ["word:node.js"]);
+  assert.deepEqual(reasons("Built on nodexjs today.", ["node.js"]), [],
+    "an unescaped `.` would match any character");
+  // The boundary holds on both sides: `northwindish` is covered above.
+  assert.deepEqual(reasons("A preNorthwind plan.", ["northwind"]), [],
+    "the word must start on a word boundary as well as end on one");
+});
+
+test("an empty word in the list is ignored, and the reason names the word that matched", () => {
+  // An empty word would compile to a boundary alone and match every line
+  // that holds a letter.
+  assert.deepEqual(reasons("Plain prose about nothing.", ["", ""]), []);
+  assert.deepEqual(reasons("Northwind decided this.", ["", "northwind"]), ["word:northwind"],
+    "the reason indexes the words that were compiled, not the list as given");
+});
+
+/** Writes `files` (relative path → text) under a new fixture root. */
+function fixtureTree(files) {
+  const root = fixtureDir(join(tmpdir(), "branchling-foreign-context-"));
+  for (const [rel, text] of Object.entries(files)) {
+    const abs = join(root, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, text);
+  }
+  return root;
+}
+
+test("the tree audit reads the markdown it should, in a fixed order, and reports each file", () => {
+  // Two names whose order differs between UTF-16 code units (the order
+  // `.sort()` gives) and UTF-8 bytes (the order libuv's directory listing
+  // gives on Linux): the report's order must not depend on the platform.
+  const astral = "\u{1F600}.md";
+  const fullwidth = "\uFF01.md";
+  const read = {
+    "docs/guide.md": "Run it from\n/home/jane/one\n",
+    "docs/numbers.md": "The backlog holds 1362 tasks.",
+    ["docs/sorted/" + fullwidth]: "/home/jane/fullwidth",
+    ["docs/sorted/" + astral]: "/home/jane/astral",
+    "LINEAGE.md": "Where this came from.\nNothing to report.\n",
+    // The measurement rule does not run in the backlog; the path rule does.
+    "backlog/task.md": "- 2026-09-01 migration of 1145 tasks\n/home/jane/two",
+  };
+  const skipped = {
+    "docs/.git/x.md": "/home/jane/git",
+    "docs/node_modules/x.md": "/home/jane/modules",
+    "docs/demo/x.md": "/home/jane/demo",
+    "docs/notes.md.bak": "/home/jane/backup",
+    "docs/notes.txt": "/home/jane/text",
+  };
+  // `README.md` and `CONTRIBUTING.md` are left out: an entry of the perimeter
+  // that a tree does not have is skipped, not an error.
+  const root = fixtureTree({ ...read, ...skipped });
+  let dangling = false;
+  try {
+    symlinkSync(join(root, "nowhere.md"), join(root, "docs", "gone.md"));
+    dangling = true;
+  } catch {
+    // A platform that refuses symlinks still runs the missing-entry case.
+  }
+
+  const { findings, filesChecked, linesChecked } = auditTree(root, []);
+  assert.ok(findings.length <= 20, "the audit reported " + findings.length + " findings, the first: "
+    + JSON.stringify(findings.slice(0, SHOWN_FINDINGS)));
+  assert.deepEqual(findings.map((f) => f.file.split("\\").join("/") + ":" + f.line + ":" + f.reason), [
+    "docs/guide.md:2:personal-path",
+    "docs/numbers.md:1:measurement",
+    "docs/sorted/" + astral + ":1:personal-path",
+    "docs/sorted/" + fullwidth + ":1:personal-path",
+    "backlog/task.md:2:personal-path",
+  ]);
+  assert.equal(findings[0].text, "/home/jane/one");
+  assert.equal(filesChecked, Object.keys(read).length, "dangling link present: " + dangling);
+  const expectedLines = Object.values(read).reduce((n, text) => n + text.split(/\r?\n/).length, 0);
+  assert.equal(linesChecked, expectedLines, "every line of every file read is counted, and only those");
 });
