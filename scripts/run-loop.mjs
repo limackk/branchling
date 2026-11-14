@@ -84,12 +84,12 @@ import { DELEGATION_ENFORCEMENT, DELEGATION_POLICIES, executionReceipt } from ".
 import { loadConfigOrExit } from "./config.mjs";
 import { closingContractOf, collisionHeadline, probeContract, repoRootFor } from "./done-task.mjs";
 import { gitDiscoveryEnv } from "./git-env.mjs";
-import { historyPath, readHistory, recordEdit } from "./history.mjs";
+import { historyPath, openQuestions, readHistory, recordEdit } from "./history.mjs";
 import { roleBrief } from "./instructions.mjs";
 import { userConfigPath } from "./home.mjs";
 import { lockScope, releaseLock, stateRoot } from "./lock.mjs";
 import { clearStop, requestStop, STOP_SINCE_ENV, stopRequestedSince } from "./run-stop.mjs";
-import { callerSpecies, deadlockIdentity, describeConflict, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor, WAVE_AWAITS_MERGE, WAVE_CLAIMED_ELSEWHERE, waitingIds, waitingPhrase } from "./next-task.mjs";
+import { callerSpecies, deadlockIdentity, describeConflict, describeDeadlock, isOverSized, parkedByRun, queueStatuses, readDispatchRecords, selectCandidates, servesExecutor, WAVE_AWAITS_MERGE, WAVE_CLAIMED_ELSEWHERE, waitingIds, waitingPhrase, waveWaiting } from "./next-task.mjs";
 import { answerBacklogDirRefusal, backlogPaths, isBacklogDirRefusal, repositoryRoot, resolveBacklogDir } from "./paths.mjs";
 import { loadPlanForDispatch, planState, projectionWall } from "./plan.mjs";
 import { PRODUCT_NAME as N } from "./product.mjs";
@@ -238,12 +238,12 @@ export function parseRunArgs(args) {
         "trees; on its own there is no wave to spill out of."
     );
   }
-  // These act on the live loop only: a dry run calls no `next` to gate, to
-  // spill or to wait for, and writes no state to commit, and a flag that
-  // silently did nothing would read as a gate that passed (TL-489, TL-491,
-  // TL-707).
+  // These act on the live loop only: a dry run calls no `next` to gate or to
+  // wait for, and writes no state to commit, and a flag that silently did
+  // nothing would read as a gate that passed (TL-489, TL-491). `--spill` is not
+  // among them since TL-731: the projection follows it past a waiting wave.
   if (plan.dryRun) {
-    const live = given.filter((f) => ["--before-next", "--commit-state", "--wait", "--wait-max", "--spill"].includes(f));
+    const live = given.filter((f) => ["--before-next", "--commit-state", "--wait", "--wait-max"].includes(f));
     if (live.length) {
       throw new Error("`--dry-run` claims nothing, so " + live.join(" and ") + " has nothing to act on");
     }
@@ -2011,6 +2011,9 @@ export async function run(argv) {
     // order with nothing in it needs a second place to look for the reason, and
     // a dispatcher deciding whether to keep polling reads `--json`.
     let wall = null;
+    // Under `--spill`, the waiting wave the projection walked past (TL-731), in
+    // the shape `next --plan --json` reports as `plan.spill`; null otherwise.
+    let spill = null;
     if (planned) {
       // WAVE BY WAVE, FROM THE ACTIVE ONE ON. A single call would show only the
       // wave `next` hands out of right now, which answers "what is next" and not
@@ -2024,6 +2027,16 @@ export async function run(argv) {
         now: Date.now(),
       });
       const from = state.activeWave === null ? state.waves.length : state.activeWave;
+      // The tasks a spilled-past wave waits on, and every later task that
+      // waits on one of them: none of it is this run's to close.
+      const stranded = new Set();
+      const archived = new Set(config.archivedStatuses);
+      const byId = new Map(records.map((t) => [String(t.id).toUpperCase(), t]));
+      const queued = new Set(queueStatuses(config));
+      // Every open task of the waves walked past with no wall: the run closes
+      // all of them before it reaches the next one, so a blocker among them is
+      // not what a later wave waits on.
+      const walked = new Set();
       for (const w of state.waves.slice(from)) {
         const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
         const { candidates, skippedBlocked, skippedAsked, skippedHandedBack, skippedDeadlocked, skippedConflict } =
@@ -2039,8 +2052,76 @@ export async function run(argv) {
         // be handed, and `next` will keep answering from THIS wave until somebody
         // else finishes it. A task held by an open question is not reachable
         // whatever its blockers say (TL-666): only a person's decision lifts it.
-        wall = projectionWall(w, candidates.length + skippedBlocked - skippedAsked);
-        if (wall) break;
+        wall = projectionWall(w, candidates.length + skippedBlocked - skippedAsked - strandedIn(w));
+        if (!wall) {
+          for (const e of w.tasks) walked.add(String(e.id).toUpperCase());
+          continue;
+        }
+        // A WALL `next --plan --spill` WOULD DRAW PAST (TL-731). The live run
+        // spills only when the wave it stands in waits on claims or a merge in
+        // other trees, and into the next wave that holds open work — the one
+        // `spillWave` names once this wave is the active one. Once only: the
+        // waiting wave stays active, so a wall met after it ends the run too.
+        if (plan.spill && !spill) {
+          const waiting = waveWaiting(w.tasks.map((e) => e.id), closedByRun(planIds), config, []);
+          if (waiting.kind) {
+            const later = state.waves.find((x) => x.index > w.index && x.open > 0) || null;
+            spill = {
+              from: w.index + 1, fromName: w.name, refusalKind: waiting.kind,
+              claimedElsewhere: waiting.claimed, awaitingMerge: waiting.awaitingMerge,
+              wave: later ? later.index + 1 : null, name: later ? later.name : "",
+            };
+            for (const id of [...waiting.claimed, ...waiting.awaitingMerge, ...waiting.behind]) {
+              stranded.add(String(id).toUpperCase());
+            }
+            wall = null;
+            continue;
+          }
+        }
+        break;
+      }
+      // The records as they stand once this run has closed every task of the
+      // waves it walked through and of the wave it can reach. `next` judges a
+      // wave waiting only after the run took what it could, and the projection
+      // reads the tree before any of it, so it closes them here: the walked
+      // waves, then this wave's candidates and whatever they unblock, until the
+      // selection finds nothing new.
+      function closedByRun(planIds) {
+        const closed = config.archivedStatuses[0];
+        let view = closed
+          ? records.map((t) => walked.has(String(t.id).toUpperCase()) && !archived.has(t.status) ? { ...t, status: closed } : t)
+          : records;
+        for (;;) {
+          const { candidates } = selectCandidates(view, config, { ...base, planIds }, Date.now());
+          if (!candidates.length || !closed) return view;
+          const ids = new Set(candidates.map((t) => String(t.id).toUpperCase()));
+          view = view.map((t) => ids.has(String(t.id).toUpperCase()) ? { ...t, status: closed } : t);
+        }
+      }
+      // How many of a wave's open tasks `skippedBlocked` counted as reachable
+      // although a blocker sits in the spilled-past wave: that blocker is not
+      // this run's to close, so neither are they. Repeated within the wave,
+      // because a chain is what a wave is written for.
+      function strandedIn(w) {
+        let count = 0;
+        const rest = w.tasks.map((e) => byId.get(String(e.id).toUpperCase()))
+          .filter((t) => t && !archived.has(t.status));
+        for (let moved = true; moved;) {
+          moved = false;
+          for (const t of rest) {
+            const key = String(t.id).toUpperCase();
+            if (stranded.has(key)) continue;
+            // Every stranded id is an open task, so a blocker among them is
+            // unresolved by construction.
+            if (!(t.blocked_by || []).some((b) => stranded.has(String(b).toUpperCase()))) continue;
+            stranded.add(key);
+            moved = true;
+            // Only what `skippedBlocked` counted: a queued task, and not one
+            // `skippedAsked` already took off.
+            if (queued.has(t.status) && !openQuestions(t.history || []).length) count++;
+          }
+        }
+        return count;
       }
     } else {
       const { candidates, skippedHandedBack, skippedDeadlocked, skippedConflict } = selectCandidates(records, config, base, Date.now());
@@ -2063,7 +2144,7 @@ export async function run(argv) {
         skippedHandedBack: [...handedBack.values()].map((s) => ({ id: s.id, actor: s.actor, reason: s.reason })),
         skippedDeadlocked: [...deadlocked.values()],
         skippedConflict: [...conflicted.values()],
-        ...(planned ? { stoppedAt: wall } : {}),
+        ...(planned ? { stoppedAt: wall, spill } : {}),
       });
     } else {
       console.log("");
@@ -2087,6 +2168,17 @@ export async function run(argv) {
         console.log("  " + color.dim(MARK.warn + " " + describeDeadlock(finding)));
       }
       for (const skip of conflicted.values()) console.log("  " + color.dim(describeConflict(skip)));
+      if (spill) {
+        console.log("  " + color.dim(
+          "wave " + spill.from + " — " + (spill.fromName || "unnamed") + " " + waitingPhrase(spill.refusalKind) +
+          " (" + spill.refusalKind + "); " + (spill.wave
+            ? "`--spill` projects on into wave " + spill.wave + " — " + (spill.name || "unnamed")
+            : "`--spill` finds no later wave with open work to draw from")
+        ));
+        for (const line of waitingIds({ claimed: spill.claimedElsewhere, awaitingMerge: spill.awaitingMerge })) {
+          console.log("    " + color.dim(line));
+        }
+      }
       if (wall) {
         console.log("  " + color.dim(
           "the projection stops at wave " + wall.wave + " — " + (wall.name || "unnamed") + ": " +

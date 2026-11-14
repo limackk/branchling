@@ -33,6 +33,13 @@
  *                           and for a run that waited on a wave, took a task
  *                           and then stopped on --max-tasks with no later
  *                           `next` answer to overwrite the field.
+ *   --dry-run --spill     — the projection walks past a waiting wave into the
+ *                           one a spill draws from, and the same tree without
+ *                           the flag stops at it (TL-731). A wall that is not
+ *                           waiting, and a wall met after the spill, still stop
+ *                           it; a free task in the waiting wave is projected
+ *                           first, because the live run takes it before `next`
+ *                           calls that wave waiting.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -321,18 +328,15 @@ test("--spill into a wave with nothing free says so", () => {
   });
 });
 
-test("--spill is refused without --plan and with --dry-run, and run --help declares it", () => {
+test("--spill is refused without --plan, and run --help declares it", () => {
   const env = { ...process.env, NO_COLOR: "1" };
   const alone = cli(["run", "--spill", "--agent", "true"], env);
   assert.equal(alone.code, 2, alone.out + alone.err);
   assert.match(alone.err, /`--spill` with no `--plan`/);
   assert.match(alone.err, /It lets `--plan` draw from the next wave while the active one waits on other/);
   assert.match(alone.err, /trees; on its own there is no wave to spill out of\./);
-  const dry = cli(["run", "--plan", "--spill", "--dry-run"], env);
-  assert.equal(dry.code, 2, dry.out + dry.err);
-  assert.match(dry.err, /`--dry-run` claims nothing, so --spill has nothing to act on/);
-  // The line that refuses it refuses every flag that acts on the live loop,
-  // and names each one it was given.
+  // The line that refused it under --dry-run still refuses every flag that
+  // acts on the live loop only, and names each one it was given.
   for (const [flags, named] of [
     [["--before-next", "true"], "--before-next"],
     [["--commit-state"], "--commit-state"],
@@ -351,6 +355,261 @@ test("--spill is refused without --plan and with --dry-run, and run --help decla
   assert.equal(help.code, 0, help.err);
   assert.match(help.out, /\[--plan \[--spill\]\]/);
   assert.match(help.out, /--spill is passed on to `next`/);
+  assert.match(help.out, /Under --dry-run the projection does the same:/);
+});
+
+// ── `--dry-run --spill` projects past a waiting wave (TL-731) ──────────────
+
+function dryRun(f, extra) {
+  const r = cli(["run", "--dir", f.backlog, "--actor", RUN_ACTOR, "--plan", "--dry-run"].concat(extra || []),
+    f.env, { cwd: f.repoRoot });
+  assert.equal(r.code, 0, r.out + r.err);
+  return r;
+}
+
+function dryJson(f, extra) {
+  return JSON.parse(dryRun(f, ["--json"].concat(extra || [])).out);
+}
+
+/** Adds task b to the fixture, rewrites the plan as `waves` (lists of keys). */
+function addTaskAndPlan(f, waves) {
+  const r = cli(["new", "--dir", f.backlog, "--title", "Fixture task b", "--priority", "P1"], f.env);
+  assert.equal(r.code, 0, r.err);
+  f.ids.b = (r.out.match(/([A-Z]+-\d+)/) || [])[1];
+  assert.ok(f.ids.b, "the fixture task got no id: " + r.out);
+  writeFileSync(join(f.backlog, "plan.yaml"), ["updated: 2026-11-13", 'rationale: "fixture"', "waves:"]
+    .concat(...waves.map(([name, keys]) => ['  - name: "' + name + '"',
+      "    tasks: [" + keys.map((k) => f.ids[k]).join(", ") + "]"]))
+    .concat([""]).join("\n"), "utf8");
+}
+
+test("run --dry-run --plan --spill projects past a waiting wave; without --spill it stops there", () => {
+  const f = tree({ setup: claimedHere });
+
+  const control = dryJson(f);
+  assert.deepEqual(control.order, [], "the control projected past a waiting wave without --spill");
+  assert.equal(control.stoppedAt.wave, 1);
+  assert.equal(control.stoppedAt.left, 1);
+  assert.equal(control.spill, null);
+
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order.map((r) => [r.id, r.wave, r.waveName]), [[f.ids.c, 2, "Second"]]);
+  assert.equal(report.stoppedAt, null, JSON.stringify(report.stoppedAt));
+  assert.deepEqual(report.spill, {
+    from: 1, fromName: "First", refusalKind: "wave-claimed-elsewhere",
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], wave: 2, name: "Second",
+  });
+
+  const text = dryRun(f, ["--spill"]).out;
+  assert.match(text, /1 task would run, in this order:/);
+  assert.match(text, new RegExp("wave 2 — Second\\n\\s+\\S+ " + f.ids.c + "  P1  Fixture task c"));
+  assert.ok(text.includes("\n  wave 1 — First is waiting on claims held in another tree or session " +
+    "(wave-claimed-elsewhere); `--spill` projects on into wave 2 — Second\n"), text);
+  assert.ok(text.includes("\n    claimed in another tree or session: " + f.ids.a + "\n"), text);
+  assert.doesNotMatch(text, /the projection stops at/);
+  assert.doesNotMatch(dryRun(f).out, /--spill` projects/);
+
+  // A projection claims nothing.
+  assert.equal(statusOf(f.backlog, f.ids.c), "pending");
+  assert.equal(statusOf(f.backlog, f.ids.a), "in_progress");
+});
+
+test("run --dry-run --spill names a wave waiting on a merge", () => {
+  const f = tree({ feature: (t) => setField(t.backlog, t.ids.a, "status", "done") });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order.map((r) => r.id), [f.ids.c]);
+  assert.equal(report.spill.refusalKind, "wave-awaits-merge");
+  assert.deepEqual(report.spill.awaitingMerge, [f.ids.a]);
+  assert.deepEqual(report.spill.claimedElsewhere, []);
+});
+
+test("run --dry-run --spill takes the waiting wave's free task first, then spills", () => {
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a", "b"]], ["Second", ["c"]]]);
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order.map((r) => [r.id, r.wave]), [[f.ids.b, 1], [f.ids.c, 2]]);
+  assert.equal(report.spill.from, 1);
+  assert.equal(report.spill.wave, 2);
+  assert.equal(report.stoppedAt, null);
+  assert.equal(dryJson(f).stoppedAt.wave, 1, "the control did not stop at the waiting wave");
+});
+
+test("run --dry-run --spill judges a later wave waiting once the run closed the waves before it", () => {
+  // c waits on b, which the run closes in wave 1, so wave 2 waits on a alone —
+  // the live run takes b, then c, then spills. No wave follows to draw from.
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["b"]], ["Second", ["a", "c"]]]);
+      setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.b + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order.map((r) => [r.id, r.wave]), [[f.ids.b, 1]]);
+  assert.deepEqual(report.spill, {
+    from: 2, fromName: "Second", refusalKind: "wave-claimed-elsewhere",
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], wave: null, name: "",
+  });
+  assert.equal(report.stoppedAt, null);
+  const text = dryRun(f, ["--spill"]).out;
+  assert.ok(text.includes("wave 2 — Second is waiting on claims held in another tree or session " +
+    "(wave-claimed-elsewhere); `--spill` finds no later wave with open work to draw from"), text);
+  assert.equal(dryJson(f).stoppedAt.wave, 2, "the control did not stop at the waiting wave");
+});
+
+test("run --dry-run --spill closes what the waiting wave's free task unblocks before judging it", () => {
+  // The run takes b, then c, and only then does `next` find wave 1 waiting on a.
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a", "b", "c"]]]);
+      setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.b + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order.map((r) => r.id), [f.ids.b]);
+  assert.deepEqual([report.spill.from, report.spill.refusalKind, report.spill.wave],
+    [1, "wave-claimed-elsewhere", null]);
+  assert.equal(report.stoppedAt, null);
+});
+
+test("run --dry-run --spill stops at a spill wave whose task waits on the waiting wave", () => {
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.a + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order, []);
+  assert.equal(report.spill.wave, 2);
+  assert.equal(report.stoppedAt.wave, 2, JSON.stringify(report.stoppedAt));
+  assert.equal(report.stoppedAt.left, 1);
+  assert.match(dryRun(f, ["--spill"]).out, /the projection stops at wave 2 — Second: 1 of 1 open task in it is not/);
+});
+
+test("run --dry-run --spill spills once: a wall met after the spill ends the projection", () => {
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a"]], ["Second", ["b"]], ["Third", ["c"]]]);
+      setField(t.backlog, t.ids.b, "status", "in_progress");
+      setField(t.backlog, t.ids.b, "owner", OTHER_ACTOR);
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order, []);
+  assert.equal(report.spill.from, 1);
+  assert.equal(report.stoppedAt.wave, 2, "the projection spilled twice: " + JSON.stringify(report));
+});
+
+test("run --dry-run --spill does not walk past a wave that is not waiting", () => {
+  // `a` is protected: no claim released elsewhere and no merge hands it out.
+  const f = tree({ setup: (t) => setField(t.backlog, t.ids.a, "status", "blocked") });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order, []);
+  assert.equal(report.spill, null);
+  assert.equal(report.stoppedAt.wave, 1);
+});
+
+test("run --dry-run --spill draws from the next wave with open work, past a closed one", () => {
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a"]], ["Second", ["b"]], ["Third", ["c"]]]);
+      setField(t.backlog, t.ids.b, "status", "done");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual([report.spill.wave, report.spill.name], [3, "Third"]);
+  assert.deepEqual(report.order.map((r) => [r.id, r.wave]), [[f.ids.c, 3]]);
+});
+
+test("run --dry-run --spill: a wave blocked by a later wave's task is not waiting", () => {
+  // c waits on b in wave 2, which no other tree holds: `next` calls wave 1
+  // nothing-to-take, not waiting, and a spill does not apply.
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a", "c"]], ["Second", ["b"]]]);
+      setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.b + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.equal(report.spill, null, JSON.stringify(report.spill));
+  assert.equal(report.stoppedAt.wave, 1);
+  assert.deepEqual(report.order, []);
+});
+
+test("run --dry-run --spill: a chain inside the spill wave is reachable when its head is free", () => {
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a"]], ["Second", ["c", "b"]]]);
+      setField(t.backlog, t.ids.b, "blocked_by", "[" + t.ids.c + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order.map((r) => [r.id, r.wave]), [[f.ids.c, 2]]);
+  assert.equal(report.stoppedAt, null, JSON.stringify(report.stoppedAt));
+});
+
+test("run --dry-run --spill: a chain behind the waiting wave strands every link of it", () => {
+  // b is listed first, so the pass that strands c has already stepped over b.
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a"]], ["Second", ["b", "c"]]]);
+      setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.a + "]");
+      setField(t.backlog, t.ids.b, "blocked_by", "[" + t.ids.c + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order, []);
+  assert.deepEqual([report.stoppedAt.wave, report.stoppedAt.open, report.stoppedAt.left], [2, 2, 2]);
+});
+
+test("run --dry-run --spill: a closed task between the waiting wave and the next one strands nothing", () => {
+  const f = tree({
+    setup: (t) => {
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a"]], ["Second", ["b", "c"]]]);
+      setField(t.backlog, t.ids.b, "status", "done");
+      setField(t.backlog, t.ids.b, "blocked_by", "[" + t.ids.a + "]");
+      setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.b + "]");
+    },
+  });
+  const report = dryJson(f, ["--spill"]);
+  assert.deepEqual(report.order.map((r) => [r.id, r.wave]), [[f.ids.c, 2]]);
+  assert.equal(report.stoppedAt, null, JSON.stringify(report.stoppedAt));
+});
+
+test("run --dry-run --spill subtracts only what the selection counted as reachable", () => {
+  // A protected status was never counted as reachable, and an open question
+  // was already taken off by `skippedAsked`: neither is subtracted twice.
+  for (const hold of ["status", "question"]) {
+    const f = tree({
+      setup: (t) => {
+        claimedHere(t);
+        setField(t.backlog, t.ids.c, "blocked_by", "[" + t.ids.a + "]");
+        if (hold === "status") {
+          setField(t.backlog, t.ids.c, "status", "blocked");
+        } else {
+          const r = cli(["ask", t.ids.c, "--question", "Which layout does this keep?",
+            "--dir", t.backlog, "--actor", "agent:asker"], t.env);
+          assert.equal(r.code, 0, r.out + r.err);
+          setField(t.backlog, t.ids.c, "status", "pending");
+        }
+      },
+    });
+    const report = dryJson(f, ["--spill"]);
+    assert.equal(report.spill.wave, 2, hold);
+    assert.deepEqual([report.stoppedAt.wave, report.stoppedAt.open, report.stoppedAt.left], [2, 1, 1], hold);
+  }
 });
 
 // ── The sentence, from `next`'s answer alone ───────────────────────────────
