@@ -783,3 +783,114 @@ test("an UNINDENTED fence still ends the criterion before it", () => {
   assert.deepEqual(items[0].proofs, ["real"]);
   assert.equal(items[0].endLine, 2);
 });
+
+// A CHECKBOX AT A CRITERION'S CONTINUATION COLUMN CONTINUES IT (TL-733). This
+// backlog wraps a criterion at six columns, the width of `- [ ] `, so a code
+// sample written inside a criterion at that column is not a fence — four
+// columns past the item's content column (2) is too deep to open one — and,
+// by the same CommonMark rule, its `- [ ]` line is not a list item either: it
+// is paragraph continuation text. The parser matched a checkbox at any
+// indentation and split the criterion in two, stranding its first half with
+// no proof and handing the second half a phantom's text.
+const sixColumnSample = [
+  "## Acceptance criteria",
+  "",
+  "- [ ] Shows its shape:",
+  "      ```md",
+  "      - [ ] example",
+  "      - plain",
+  "      ```",
+  "      and ends. [proof: a]",
+].join("\n");
+
+test("a `- [ ]` line at a criterion's six-column continuation is not an item", () => {
+  const { items } = parseCriteria(sixColumnSample);
+  assert.equal(items.length, 1, JSON.stringify(items.map((i) => i.text)));
+  assert.equal(items[0].line, 2);
+  assert.equal(items[0].endLine, 7);
+  assert.deepEqual(items[0].proofs, ["a"]);
+  assert.equal(items[0].text, "Shows its shape: ```md - [ ] example - plain ``` and ends.");
+});
+
+test("`applyProofs` never ticks a `- [ ]` line at the continuation column", () => {
+  const { text, ticked } = applyProofs("---\nid: MAP-5\n---\n" + sixColumnSample, ["a"]);
+  assert.equal(ticked.length, 1);
+  assert.match(text, /^- \[x\] Shows its shape:$/m);
+  assert.match(text, /^ {6}- \[ \] example$/m, "the line inside the sample was rewritten");
+});
+
+test("POSITIVE CONTROL: a nested `- [ ]` at two columns is still its own criterion", () => {
+  // Without this, "never read an indented checkbox as an item" would pass both
+  // tests above. A two-column item is a real nested list item in markdown.
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] Parent. [proof: a]",
+    "  - [ ] Nested sub-criterion. [proof: b]",
+    "    - [ ] Nested deeper, four columns past column 0. [proof: c]",
+  ].join("\n"));
+  assert.deepEqual(items.map((i) => i.text),
+    ["Parent.", "Nested sub-criterion.", "Nested deeper, four columns past column 0."]);
+  assert.deepEqual(items.map((i) => i.proofs), [["a"], ["b"], ["c"]]);
+});
+
+test("the threshold is relative to the OPEN criterion's content column, not a fixed number", () => {
+  // Under `  - [ ] sub` (content column 4) a checkbox at six columns is a
+  // further nested item, and only one at eight continues the sub-criterion;
+  // three spaces after a top-level marker move the content column to 4 and
+  // the threshold with it.
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] Parent. [proof: a]",
+    "  - [ ] Sub, continued below:",
+    "        - [ ] continuation at eight",
+    "        still the sub. [proof: b]",
+    "      - [ ] A nested item at six. [proof: c]",
+    "-   [ ] Three spaces after the marker:",
+    "         - [ ] continuation at nine",
+    "      end. [proof: d]",
+  ].join("\n"));
+  assert.deepEqual(items.map((i) => i.text), [
+    "Parent.",
+    "Sub, continued below: - [ ] continuation at eight still the sub.",
+    "A nested item at six.",
+    "Three spaces after the marker: - [ ] continuation at nine end.",
+  ]);
+  assert.deepEqual(items.map((i) => i.proofs), [["a"], ["b"], ["c"], ["d"]]);
+});
+
+test("below the continuation column a checkbox still opens a criterion, measured from the content column", () => {
+  // Column 5 under `- [ ]` (content column 2) is three past it: a nested list
+  // item in CommonMark. Column 6 under `-   [ ]` (content column 4) is two past
+  // it. Both are criteria; a threshold off by one column, or one that ignored
+  // the spaces after the marker, would swallow them.
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ] First. [proof: a]",
+    "     - [ ] At five. [proof: b]",
+    "-   [ ] Wide marker. [proof: c]",
+    "      - [ ] At six under it. [proof: d]",
+  ].join("\n"));
+  assert.deepEqual(items.map((i) => i.text), ["First.", "At five.", "Wide marker.", "At six under it."]);
+  assert.deepEqual(items.map((i) => i.line), [2, 3, 4, 5]);
+});
+
+test("the continuation rule leaves the shape of an ordinary line alone", () => {
+  // Mid-line `- [ ]` and ` - ` are text, a checkbox glued to its sentence is
+  // still a criterion, and a whitespace-only line is blank: it ends the
+  // criterion like an empty one.
+  const { items } = parseCriteria([
+    "## Acceptance criteria",
+    "",
+    "- [ ]Glued to its box,",
+    "  see - [ ] here - and there. [proof: a]",
+    "- [ ] Ends at a whitespace-only line. [proof: b]",
+    "   ",
+    "  stranded",
+  ].join("\n"));
+  assert.deepEqual(items.map((i) => i.text),
+    ["Glued to its box, see - [ ] here - and there.", "Ends at a whitespace-only line."]);
+  assert.deepEqual(items.map((i) => i.proofs), [["a"], ["b"]]);
+});

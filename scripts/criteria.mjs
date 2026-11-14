@@ -51,7 +51,7 @@
 // it here would make `id: the-name  # optional` parse as an id with a comment in
 // it, which is exactly the class of bug that module was extracted to end.
 import { stripComment, unquote } from "./task-fields.mjs";
-import { fencedLines } from "./markdown-fence.mjs";
+import { contentColumn, fencedLines, indentOf } from "./markdown-fence.mjs";
 
 /** The heading that opens the criteria list. Part of the FORMAT (`_template.md`
  *  writes it), so it belongs in the code — unlike statuses or labels, which are
@@ -256,6 +256,21 @@ export function parseCriteria(body) {
   // WHERE `[proof:]` MAY STAND: at the end of the LAST line, which is where a
   // person writes it. One place rather than two: a second permitted position
   // buys nothing and makes the rule harder to state than to follow.
+  //
+  // A CHECKBOX FOUR OR MORE COLUMNS PAST THE OPEN CRITERION'S CONTENT COLUMN
+  // CONTINUES IT (TL-733), and so does a plain `- ` line there, which would
+  // otherwise end the criterion and strand its `[proof:]` the same way.
+  // CommonMark's list-item rules: a line indented that far past an item's
+  // content column can open neither a fence nor a list item, and indented
+  // code cannot interrupt a paragraph, so it is the criterion's own paragraph
+  // text. This backlog wraps a criterion at six
+  // columns — the width of `- [ ] ` — which puts a code sample written inside
+  // one exactly there, and reading its `- [ ]` line as an item split the
+  // criterion in two and stranded its first half without its `[proof:]`. The
+  // threshold is relative, not a fixed number: the content column is the one
+  // `fencedLines()` computes for the same line (for `- [ ] text` it is 2, the
+  // checkbox being content), so `  - [ ] sub` is still a nested criterion, and
+  // under it only a checkbox at column 8 or deeper continues the sub.
   let current = null;
   const close = () => {
     if (!current) return;
@@ -288,19 +303,25 @@ export function parseCriteria(body) {
       current.item.endLine = i;
       continue;
     }
-    const m = raw.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
+    const deep = current !== null && indentOf(raw) - current.column >= 4;
+    const m = deep ? null : raw.match(/^(\s*)-(\s*)\[([ xX])\]\s*(.*)$/);
     if (m) {
       close();
       // `line` stays the index of the `- [ ]` line and of no other: it is what
       // `applyProofs` writes the tick onto, and a tick landing on a
       // continuation would corrupt the sentence instead of marking it.
-      current = { item: { text: "", checked: m[1] !== " ", proofs: [], line: i, endLine: i }, parts: [m[2]] };
+      current = {
+        item: { text: "", checked: m[3] !== " ", proofs: [], line: i, endLine: i },
+        parts: [m[4]],
+        column: contentColumn(indentOf(raw), "-", m[2], "["),
+      };
       continue;
     }
     if (!current) continue;
     // A list item that is not a criterion, or an unindented line, or a blank
-    // one: the criterion ended at the line before.
-    if (!raw.trim() || !/^\s/.test(raw) || /^\s*-\s/.test(raw)) { close(); continue; }
+    // one: the criterion ended at the line before. A list marker at the
+    // continuation column is none of the three — it is text, by the rule above.
+    if (!raw.trim() || !/^\s/.test(raw) || (!deep && /^\s*-\s/.test(raw))) { close(); continue; }
     current.parts.push(raw.trim());
     current.item.endLine = i;
   }

@@ -39,7 +39,7 @@ const FENCE_RUN = /^(`{3,}|~{3,})/;
 const LIST_ITEM = /^( *)([-+*]|\d{1,9}[.)])( +|$)(.*)/;
 
 /** The number of leading spaces of a line. */
-function indentOf(line) {
+export function indentOf(line) {
   return line.length - line.replace(/^ +/, "").length;
 }
 
@@ -47,8 +47,11 @@ function indentOf(line) {
  * The column a list item's content starts at. CommonMark: one to four spaces
  * after the marker belong to it; five or more, or none before an empty line,
  * mean the content column is the marker plus one space.
+ *
+ * Exported for `parseCriteria()` (TL-733), which needs the same column to
+ * decide where a criterion's continuation text starts.
  */
-function contentColumn(indent, marker, spaces, rest) {
+export function contentColumn(indent, marker, spaces, rest) {
   const width = indent + marker.length;
   if (!rest || spaces.length > 4) return width + 1;
   return width + spaces.length;
