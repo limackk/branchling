@@ -2041,7 +2041,7 @@ export async function run(argv) {
       const walked = new Set();
       for (const w of state.waves.slice(from)) {
         const planIds = new Set(w.tasks.map((e) => String(e.id).toUpperCase()));
-        const { candidates, skippedBlocked, skippedAsked, skippedHandedBack, skippedDeadlocked, skippedConflict } =
+        const { candidates, admitted, skippedBlocked, skippedAsked, skippedHandedBack, skippedDeadlocked, skippedConflict } =
           selectCandidates(records, config, { ...base, planIds }, Date.now());
         for (const t of candidates) rows.push({ task: t, wave: w.index + 1, name: w.name });
         for (const s of skippedConflict) conflicted.set(s.id, s);
@@ -2064,8 +2064,14 @@ export async function run(argv) {
         // other trees, and into the next wave that holds open work — the one
         // `spillWave` names once this wave is the active one. Once only: the
         // waiting wave stays active, so a wall met after it ends the run too.
+        // Judged by THIS caller's filters (TL-743): `admitted` is the set the
+        // live `next` passes, so a blocked task the run's roles, species or
+        // size never serve does not make the wave waiting. It is taken from
+        // the tree as read, not from `closedByRun`: that view only closes
+        // tasks, and admission reads a task's own status and fields, so every
+        // task still open in the view is admitted exactly as it was.
         if (plan.spill && !spill) {
-          const waiting = waveWaiting(w.tasks.map((e) => e.id), closedByRun(planIds), config, []);
+          const waiting = waveWaiting(w.tasks.map((e) => e.id), closedByRun(planIds), config, [], [], admitted);
           if (waiting.kind) {
             const later = state.waves.find((x) => x.index > w.index && x.open > 0) || null;
             spill = {
