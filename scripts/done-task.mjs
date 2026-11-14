@@ -93,7 +93,6 @@ export const REFUSAL_KINDS = Object.freeze({
   internal: "internal",
   unwritable: "unwritable",
   historyUnwritable: "history-unwritable",
-  awaitingVouch: "awaiting-vouch",
 });
 
 /**
@@ -1411,6 +1410,14 @@ export function awaitingVouchReason(results, awaiting) {
  * The criteria are NOT ticked and the closing status is NOT written: nothing
  * here is closed, and a later `done` in a terminal re-runs the contract and
  * asks.
+ *
+ * NO `--json` ANSWER, deliberately (TL-736). The park is reached only without
+ * `--json`: under it the `manual:` callback refuses with `manual-needs-person`
+ * before a terminal is looked for, and `--confirm-manual` clears the vouch
+ * status, so `awaiting` stays empty. That refusal is what `run` parks on
+ * (TL-212). A JSON answer here could never be written, and an
+ * `awaiting-vouch` refusal kind would be one nobody publishes; making `--json`
+ * park instead would change the exit code and kind `run` receives.
  */
 function parkAwaitingVouch({ plan, root, file, raw, before, config, actor, results, awaiting, status }) {
   const reason = awaitingVouchReason(results, awaiting);
@@ -1418,7 +1425,6 @@ function parkAwaitingVouch({ plan, root, file, raw, before, config, actor, resul
     log(plan.json, "  " + WARNM + " every automatic entry passed; " + awaiting.length + " `manual:` entr" +
       (awaiting.length === 1 ? "y waits" : "ies wait") + " for a person. `--dry-run`: nothing was changed.");
     log(plan.json, "    would set: status " + before.status + " → " + status);
-    if (plan.json) answer(plan, results, { status: before.status, wouldBe: status, closed: false, awaitingVouch: true });
     return EXIT_AWAITING_VOUCH;
   }
   let text;
@@ -1457,7 +1463,6 @@ function parkAwaitingVouch({ plan, root, file, raw, before, config, actor, resul
   ])));
   const build = spawnSync(process.execPath, [join(__dirname, "build-backlog.mjs"), "--dir", root], { encoding: "utf8" });
   if (build.status !== 0) console.error(WARNM + " the views were not rebuilt — run `" + N + " build` yourself");
-  if (plan.json) answer(plan, results, { status, closed: false, awaitingVouch: true, refusalKind: REFUSAL_KINDS.awaitingVouch });
   return EXIT_AWAITING_VOUCH;
 }
 
