@@ -209,8 +209,8 @@ test("configured: a park whose history cannot be written is refused, and the tas
 
 // What `--json` answers under `awaiting_vouch_status` (TL-710). It does NOT
 // park: `--json` refuses at the first `manual:` entry, before a terminal is
-// looked for, so the park's own JSON answer (`awaitingVouch: true`, kind
-// `awaiting-vouch`) is never reached from `run`. This refusal is what `run`
+// looked for, so the park has no JSON answer of its own (TL-736 removed the
+// two it carried, which could never be written). This refusal is what `run`
 // parks on — `run-loop.mjs` maps `manual-needs-person` to the awaiting-vouch
 // status itself (TL-212) — so it is the answer a program gets, and the one
 // asserted here.
