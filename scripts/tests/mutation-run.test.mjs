@@ -30,6 +30,7 @@ import {
   SLOT_TOKEN_ENV, WORKER_TEST_FILES, cgroupHeadroom, chooseConcurrency, describeHolder, releaseSlot, slotPath, testFileConcurrency, tryAcquireSlot,
 } from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
+import { containedGroupProbe } from "./_git.mjs";
 
 const HOME = isolateHome("mutation-run");
 // Every run spawned here, and the slot holders below, use a throwaway slot,
@@ -426,6 +427,20 @@ test("a test command whose node is left without a script ends at once, though it
     child.on("exit", () => { clearTimeout(timer); resolve("ended"); });
   });
   assert.equal(held, "hung", "an open stdin no longer holds a script-less node, so this test proves nothing");
+});
+
+// TL-740: a mutant that dropped `detached` (and `stdio`) from contain()'s spawn
+// options was reported as a Timeout, because the hook test that should notice
+// waits on the wrapper forever. This asks the property itself, within seconds.
+test("the contained command leads its own process group and its output passes through", { skip: process.platform === "win32" }, () => {
+  const contained = containedGroupProbe();
+  assert.equal(contained.status, 0, contained.output);
+  assert.ok(contained.pid, "the contained shell's line did not reach the caller:\n" + contained.output);
+  assert.equal(contained.pgid, contained.pid, "the contained command does not lead its own process group");
+  // POSITIVE CONTROL: the same shell run directly shares this process's group.
+  const plain = containedGroupProbe({ contain: false });
+  assert.ok(plain.pid, "the probe printed nothing, so the contained case proves nothing:\n" + plain.output);
+  assert.notEqual(plain.pgid, plain.pid, "an uncontained shell leads a group too, so the contained case proves nothing");
 });
 
 test("the bound is passed only to a node that accepts --test-concurrency, and never above cores - 1", () => {

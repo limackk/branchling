@@ -44,3 +44,24 @@ export function containedSpawnSync(command, args, options = {}) {
 export function git(cwd, args, options = {}) {
   return containedSpawnSync("git", args, { cwd, encoding: "utf8", timeout: 30_000, ...options });
 }
+
+/**
+ * The pid and process group of a shell run under the containing entry (TL-740).
+ *
+ * Everything above rests on the contained command leading its own group. When
+ * it does not, a hook's orphans hold the wrapper's pipes open, the wrapper
+ * catches the timeout's SIGTERM and stays, and `spawnSync` waits for it with
+ * no end — a hang, not a failure. This probe runs a command that orphans
+ * nothing, under a SIGKILL deadline the wrapper cannot catch, so a caller can
+ * assert leadership in seconds before it starts anything that would hang.
+ * `pid` and `pgid` are null when the shell's line did not arrive, which is
+ * what a wrapper that no longer passes its command's output through shows.
+ */
+export function containedGroupProbe({ contain = true } = {}) {
+  const probe = ["sh", "-c", 'echo "$$ $(ps -o pgid= -p $$)"'];
+  const r = contain
+    ? spawnSync(process.execPath, [CONTAIN_ENTRY, ...probe], { encoding: "utf8", timeout: 10_000, killSignal: "SIGKILL" })
+    : spawnSync(probe[0], probe.slice(1), { encoding: "utf8", timeout: 10_000, killSignal: "SIGKILL" });
+  const m = (r.stdout || "").trim().match(/^(\d+)\s+(\d+)$/);
+  return { pid: m ? Number(m[1]) : null, pgid: m ? Number(m[2]) : null, status: r.status, output: (r.stdout || "") + (r.stderr || "") };
+}
