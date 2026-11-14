@@ -212,6 +212,9 @@ export function writeBody(opts) {
       ok: false, kind: "closed", id,
       message: id + " is closed (status: " + record.status + ")",
       details: ["A closed task is a record of what was decided; reopen it deliberately before rewriting it."],
+      // The route that withdraws a closing is `take --reopen` (TL-714); the
+      // refusal names it as a command, as take and handoff do (TL-737).
+      next: [N + " take " + id + " --reopen --reason \"…\" --actor " + actor],
     };
   }
 
@@ -385,10 +388,10 @@ export async function run(argv) {
     if (plan.json) {
       printJson("task-body", {
         ok: false, id: result.id || plan.id, actorSource, refusalKind: result.kind,
-        refusal: result.message, details: result.details || [],
+        refusal: result.message, details: (result.details || []).concat(result.next || []),
       });
     } else {
-      console.error(failure(COMMAND, result.message, result.details || []));
+      console.error(failure(COMMAND, result.message, result.details || [], result.next || []));
     }
     return result.kind === "not-found" ? 2 : 1;
   }
