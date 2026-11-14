@@ -820,14 +820,18 @@ three:
 | `refusalKind` | what it means | what to do |
 | --- | --- | --- |
 | `nothing-to-take` | no open task of the active wave will be handed to this caller, and waiting would not change that — or nothing is left at all | stop |
-| `wave-claimed-elsewhere` | every open task of the active wave is claimed in another tree or session, or blocked only by one that is | ask again when those claims are closed and merged |
+| `wave-claimed-elsewhere` | every open task of the active wave is claimed in another tree or session, or blocked only by one that is, or held back only by a conflict group one that is holds | ask again when those claims are closed and merged |
 | `wave-awaits-merge` | the active wave's open work is closed on a branch not merged here, and the merge is all that is missing | ask again after the merge |
 
 The waiting kinds require EVERY open task of the wave to be accounted for: one
 task held back by a role, an executor or a protected status keeps the answer at
 `nothing-to-take`, because no claim released elsewhere will ever hand it out.
-The refusal names the ids it waits on, under `claimedElsewhere`,
-`awaitingMerge` and `waitingBehind` in `plan`.
+A task held back by a conflict group waits only while every task holding that
+group is itself waiting work of the same wave; a holder outside the wave — a
+later wave's task, or one no wave schedules — keeps the answer at
+`nothing-to-take`, because nothing in the plan says when it closes. The refusal
+names the ids it waits on, under `claimedElsewhere`, `awaitingMerge`,
+`waitingBehind` and `waitingConflict` in `plan`.
 
 `--spill`, on `next` and on `run`, lets a caller work while it waits: when the
 active wave is waiting, `next` draws from the next wave that holds open work

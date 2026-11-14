@@ -385,14 +385,14 @@ test("--spill without --plan is a usage error", () => {
 // ── The pure judgement ─────────────────────────────────────────────────────
 
 const CONFIG = { archivedStatuses: ["done", "cancelled"], inProgressStatus: "in_progress" };
-const NONE = { kind: null, claimed: [], awaitingMerge: [], behind: [] };
+const NONE = { kind: null, claimed: [], awaitingMerge: [], behind: [], conflict: [] };
 
 test("waveWaiting: a reservation held during the call counts as a claim", () => {
   // `X-1` carries no `elsewhere` at all: a record read without the scan.
   const records = [{ id: "X-1", status: "pending" }, { id: "X-2", status: "done" }];
   assert.deepEqual(waveWaiting(["X-1", "X-2"], records, CONFIG, []), NONE);
   assert.deepEqual(waveWaiting(["x-1", "X-2"], records, CONFIG, ["x-1"]), {
-    kind: "wave-claimed-elsewhere", claimed: ["X-1"], awaitingMerge: [], behind: [],
+    kind: "wave-claimed-elsewhere", claimed: ["X-1"], awaitingMerge: [], behind: [], conflict: [],
   });
   assert.deepEqual(waveWaiting([], records, CONFIG, []), NONE);
   assert.deepEqual(waveWaiting(["X-2", "X-9"], records, CONFIG, []), NONE, "closed and unknown ids wait on nothing");
@@ -404,7 +404,7 @@ test("waveWaiting: a chain behind a claim waits, in any order; a second, free bl
   const last = { id: "X-3", status: "pending", blocked_by: ["x-2"] };
   const middle = { id: "X-2", status: "pending", blocked_by: ["x-1"] };
   assert.deepEqual(waveWaiting(["X-3", "X-2", "X-1"], [last, middle, claim], CONFIG, []), {
-    kind: "wave-claimed-elsewhere", claimed: ["X-1"], awaitingMerge: [], behind: ["X-2", "X-3"],
+    kind: "wave-claimed-elsewhere", claimed: ["X-1"], awaitingMerge: [], behind: ["X-2", "X-3"], conflict: [],
   });
   const free = { id: "X-4", status: "pending" };
   const both = { id: "X-5", status: "pending", blocked_by: ["X-1", "X-4"] };

@@ -407,7 +407,7 @@ export function planWaiting(answer) {
  *
  * @param {object|null} answer the envelope `next` printed on exit 3
  * @returns {object|null} `{kind, wave, name, claimedElsewhere, awaitingMerge,
- *   waitingBehind}`, or null when `next` did not call the wave waiting
+ *   waitingBehind, waitingConflict}`, or null when `next` did not call the wave waiting
  */
 export function planWaitingWave(answer) {
   const kind = planWaiting(answer);
@@ -421,6 +421,7 @@ export function planWaitingWave(answer) {
     claimedElsewhere: plan.claimedElsewhere || [],
     awaitingMerge: plan.awaitingMerge || [],
     waitingBehind: plan.waitingBehind || [],
+    waitingConflict: plan.waitingConflict || [],
   };
 }
 
@@ -429,7 +430,8 @@ function waitingStop(plan, kind) {
   const spill = plan.spill || null;
   const from = spill ? spill.from : plan.wave;
   const fromName = spill ? spill.fromName : plan.name;
-  const ids = waitingIds({ claimed: plan.claimedElsewhere, awaitingMerge: plan.awaitingMerge, behind: plan.waitingBehind });
+  const ids = waitingIds({ claimed: plan.claimedElsewhere, awaitingMerge: plan.awaitingMerge, behind: plan.waitingBehind,
+    conflict: plan.waitingConflict });
   const clauses = ["plan wave " + from + " (" + (fromName || "unnamed") + ") " + waitingPhrase(kind) +
     " (" + kind + ")" + (ids.length ? " — " + ids.join("; ") : "")];
   if (spill && spill.wave) {
@@ -2621,8 +2623,9 @@ export async function run(argv) {
       // `{count, ids}` of the tasks another tree of this clone holds open, from
       // the last "nothing to take" answer (TL-491); null when none was given.
       heldInOtherTrees: heldNow,
-      // `{kind, wave, name, claimedElsewhere, awaitingMerge, waitingBehind}`
-      // when the run stopped on a wave `next --plan` called waiting (TL-729).
+      // `{kind, wave, name, claimedElsewhere, awaitingMerge, waitingBehind,
+      // waitingConflict}` when the run stopped on a wave `next --plan` called
+      // waiting (TL-729).
       planWaiting: planWaitingNow,
       // `{polls, seconds, gaveUp}` under `--wait` (TL-491); null without it.
       waited,

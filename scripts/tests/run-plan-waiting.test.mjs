@@ -215,7 +215,7 @@ test("planWaiting names a wave waiting on a merge as a field", () => {
   assert.match(report.stopped, /\(wave-awaits-merge\)/);
   assert.deepEqual(report.planWaiting, {
     kind: "wave-awaits-merge", wave: 1, name: "First",
-    claimedElsewhere: [], awaitingMerge: [f.ids.a], waitingBehind: [],
+    claimedElsewhere: [], awaitingMerge: [f.ids.a], waitingBehind: [], waitingConflict: [],
   });
 });
 
@@ -234,7 +234,7 @@ test("a wave waiting on a claim is named with its kind and ids, and --wait-max e
   assert.equal(statusOf(f.backlog, f.ids.c), "pending", "the run reached past the waiting wave without --spill");
   assert.deepEqual(report.planWaiting, {
     kind: "wave-claimed-elsewhere", wave: 1, name: "First",
-    claimedElsewhere: [f.ids.a], awaitingMerge: [], waitingBehind: [],
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], waitingBehind: [], waitingConflict: [],
   });
 
   const text = cli(["run", "--dir", f.backlog, "--actor", RUN_ACTOR, "--agent", worker(f.dir), "--plan"],
@@ -317,7 +317,7 @@ test("--spill into a wave with nothing free says so", () => {
   // The field names the WAITING wave, not wave 2 the run drew from.
   assert.deepEqual(report.planWaiting, {
     kind: "wave-claimed-elsewhere", wave: 1, name: "First",
-    claimedElsewhere: [f.ids.a], awaitingMerge: [], waitingBehind: [],
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], waitingBehind: [], waitingConflict: [],
   });
 });
 
@@ -376,11 +376,11 @@ test("planWaiting: only the two waiting kinds", () => {
 
 test("planStop names every id a waiting wave waits on, then what it stepped over", () => {
   assert.equal(planStop(answer("wave-claimed-elsewhere", {
-    claimedElsewhere: ["X-1", "X-4"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"],
+    claimedElsewhere: ["X-1", "X-4"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"], waitingConflict: ["X-5"],
     skippedOutsideWave: 3, skippedUnplanned: 1,
   })), "plan wave 1 (First) is waiting on claims held in another tree or session (wave-claimed-elsewhere)" +
     " — claimed in another tree or session: X-1, X-4; closed on a branch not merged here: X-2" +
-    "; blocked only by those: X-3; 2 open tasks in later waves are not reached yet" +
+    "; blocked only by those: X-3; held back only by a conflict group those hold: X-5; 2 open tasks in later waves are not reached yet" +
     "; 1 open task the plan does not schedule was left alone");
 
   assert.equal(planStop(answer("wave-awaits-merge", {
@@ -433,10 +433,10 @@ test("planStop with no id lists or wave names still says what it knows", () => {
 
 test("planWaitingWave: the waiting wave's kind and ids, and null for every other answer", () => {
   assert.deepEqual(planWaitingWave(answer("wave-claimed-elsewhere", {
-    claimedElsewhere: ["X-1"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"],
+    claimedElsewhere: ["X-1"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"], waitingConflict: ["X-5"],
   })), {
     kind: "wave-claimed-elsewhere", wave: 1, name: "First",
-    claimedElsewhere: ["X-1"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"],
+    claimedElsewhere: ["X-1"], awaitingMerge: ["X-2"], waitingBehind: ["X-3"], waitingConflict: ["X-5"],
   });
   // Under --spill `plan.wave` is the wave drawn from; the field names the one waited on.
   assert.deepEqual(planWaitingWave(answer("wave-awaits-merge", {
@@ -445,11 +445,12 @@ test("planWaitingWave: the waiting wave's kind and ids, and null for every other
       awaitingMerge: ["X-2"], wave: 2, name: "Second" },
   })), {
     kind: "wave-awaits-merge", wave: 1, name: "First",
-    claimedElsewhere: [], awaitingMerge: ["X-2"], waitingBehind: [],
+    claimedElsewhere: [], awaitingMerge: ["X-2"], waitingBehind: [], waitingConflict: [],
   });
   // An answer with the kind and no id lists still gives lists, never undefined.
   assert.deepEqual(planWaitingWave({ refusalKind: "wave-awaits-merge", plan: { wave: 3 } }), {
     kind: "wave-awaits-merge", wave: 3, name: "", claimedElsewhere: [], awaitingMerge: [], waitingBehind: [],
+    waitingConflict: [],
   });
   assert.equal(planWaitingWave(answer("nothing-to-take")), null);
   assert.equal(planWaitingWave({ refusalKind: "wave-claimed-elsewhere", plan: null }), null);

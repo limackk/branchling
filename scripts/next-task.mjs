@@ -891,6 +891,25 @@ export const WAVE_AWAITS_MERGE = "wave-awaits-merge";
  *                  (`heldIds`, the candidates `next` passed over)
  *   behind         every unresolved blocker is itself one of the above, so it
  *                  starts the moment they arrive
+ *   conflict       held back ONLY by its conflict group (TL-734), and every
+ *                  task holding that group is itself one of the above — it is
+ *                  handed out the moment those claims are closed and merged
+ *
+ * The conflict pass reads `conflictHeld`, the `skippedConflict` entries
+ * `selectCandidates` produced for the ACTIVE wave, rather than recomputing the
+ * groups here. An entry there is a task that passed every other gate — role,
+ * executor, size, handback, blockers, claims elsewhere — and was held back by
+ * the group alone, so "only by its conflict group" is the selection's own
+ * judgement and not a second copy of it. A task held back by a role and ALSO
+ * sharing a group never reaches that list, and stays `nothing-to-take`.
+ *
+ * A HOLDER OUTSIDE THE ACTIVE WAVE does not make the task wait. That holder is
+ * an in-progress task of a later wave, or one no wave schedules, so nothing in
+ * the plan says when it closes; the waiting kinds promise a caller that the
+ * wave's OWN named work releases it, and "ask again when those claims are
+ * closed" would then point at ids the refusal does not name. Such a task stays
+ * in the rest, the answer stays `nothing-to-take`, and `skippedConflict`
+ * still names the holder for the coordinator, who owns the plan, to settle.
  *
  * The kind is `wave-claimed-elsewhere` while any task is claimed, because a
  * merge alone does not free a claim; `wave-awaits-merge` when the merge is all
@@ -900,9 +919,11 @@ export const WAVE_AWAITS_MERGE = "wave-awaits-merge";
  * @param {object[]} records task records with `elsewhere` attached
  * @param {object} config the loaded configuration
  * @param {Iterable<string>} heldIds ids a reservation held during this call
- * @returns {{kind: string|null, claimed: string[], awaitingMerge: string[], behind: string[]}}
+ * @param {Array<{id: string, heldBy: Array<{id: string}>}>} [conflictHeld] the
+ *   active wave's `skippedConflict`
+ * @returns {{kind: string|null, claimed: string[], awaitingMerge: string[], behind: string[], conflict: string[]}}
  */
-export function waveWaiting(waveIds, records, config, heldIds) {
+export function waveWaiting(waveIds, records, config, heldIds, conflictHeld = []) {
   const archived = new Set(config.archivedStatuses);
   const inProgress = inProgressStatus(config);
   const byId = new Map(records.map((t) => [String(t.id).toUpperCase(), t]));
@@ -932,29 +953,40 @@ export function waveWaiting(waveIds, records, config, heldIds) {
     }
     waiting.add(key);
   }
-  // A task blocked only by waiting work waits with it. Repeated until nothing
-  // moves, because a chain inside one wave is the case a plan is written for.
+  const holdersOf = new Map();
+  for (const skip of conflictHeld || []) {
+    holdersOf.set(String(skip.id).toUpperCase(), (skip.heldBy || []).map((h) => String(h.id).toUpperCase()));
+  }
+  // A task blocked only by waiting work, or held back only by a group that
+  // waiting work holds, waits with it. Repeated until nothing moves, because a
+  // chain inside one wave is the case a plan is written for.
   const behind = [];
+  const conflict = [];
   for (let moved = true; moved && rest.length;) {
     moved = false;
     const still = [];
     for (const t of rest) {
+      const key = String(t.id).toUpperCase();
       const unresolved = (t.blocked_by || [])
         .map((b) => String(b).toUpperCase())
         .filter((b) => !blockerResolved(byId.get(b), archived));
+      const holders = holdersOf.get(key) || [];
       if (unresolved.length && unresolved.every((b) => waiting.has(b))) {
         behind.push(t.id);
-        waiting.add(String(t.id).toUpperCase());
-        moved = true;
+      } else if (holders.length && holders.every((h) => waiting.has(h))) {
+        conflict.push(t.id);
       } else {
         still.push(t);
+        continue;
       }
+      waiting.add(key);
+      moved = true;
     }
     rest = still;
   }
-  if (rest.length) return { kind: null, claimed: [], awaitingMerge: [], behind: [] };
+  if (rest.length) return { kind: null, claimed: [], awaitingMerge: [], behind: [], conflict: [] };
   const kind = claimed.length ? WAVE_CLAIMED_ELSEWHERE : awaitingMerge.length ? WAVE_AWAITS_MERGE : null;
-  return { kind, claimed, awaitingMerge, behind };
+  return { kind, claimed, awaitingMerge, behind, conflict };
 }
 
 export function run(argv) {
@@ -1115,6 +1147,9 @@ export function run(argv) {
   // the status (TL-282). Read here and handed in, so the selection stays pure.
   filters.parkedByRun = parkedByRun(root, records, config);
   let selection = selectCandidates(records, config, filters, now);
+  // The ACTIVE wave's conflict holds, kept before a spill replaces `selection`
+  // with a later wave's: `waveWaiting` judges the active wave from them.
+  const activeConflict = selection.skippedConflict;
   // THE WAVE THE PLAN SAYS IS ACTIVE, kept apart from the one this call draws
   // from (TL-683): a spill draws from a later wave, and the refusal below still
   // has to judge whether the ACTIVE one is waiting.
@@ -1128,7 +1163,7 @@ export function run(argv) {
   // somebody is working in.
   let spill = null;
   if (plan.spill && activeWave && !selection.candidates.length) {
-    const waiting = waveWaiting(activeWave.ids, records, config, []);
+    const waiting = waveWaiting(activeWave.ids, records, config, [], activeConflict);
     if (waiting.kind) {
       const later = spillWave(planned, records, {
         archivedStatuses: config.archivedStatuses,
@@ -1422,7 +1457,7 @@ export function run(argv) {
   // A WAVE THAT IS WAITING IS NOT AN EMPTY BACKLOG (TL-683). Judged against
   // the ACTIVE wave, also after a spill found nothing: that wave is still the
   // one whose arrival the caller is waiting for.
-  const waiting = activeWave ? waveWaiting(activeWave.ids, records, config, passedOver.map((p) => p.id)) : null;
+  const waiting = activeWave ? waveWaiting(activeWave.ids, records, config, passedOver.map((p) => p.id), activeConflict) : null;
   const refusalKind = waiting && waiting.kind ? waiting.kind : "nothing-to-take";
   const refusal = waiting && waiting.kind
     ? "nothing to take now — plan wave " + (activeWave.index + 1) + " " + waitingPhrase(waiting.kind)
@@ -1436,7 +1471,8 @@ export function run(argv) {
     details.unshift(...lines);
   }
   const planOut = planJson && waiting
-    ? { ...planJson, claimedElsewhere: waiting.claimed, awaitingMerge: waiting.awaitingMerge, waitingBehind: waiting.behind }
+    ? { ...planJson, claimedElsewhere: waiting.claimed, awaitingMerge: waiting.awaitingMerge, waitingBehind: waiting.behind,
+        waitingConflict: waiting.conflict }
     : planJson;
 
   if (plan.json) {
@@ -1472,13 +1508,14 @@ export function waitingPhrase(kind) {
 /** The ids a waiting wave waits on, one line per kind that has any. PURE.
  *  The refusal's details and `run --plan`'s stop sentence (TL-707) both name
  *  them in these words, so the two cannot describe one wave differently.
- *  @param {{claimed?: string[], awaitingMerge?: string[], behind?: string[]}} waiting */
+ *  @param {{claimed?: string[], awaitingMerge?: string[], behind?: string[], conflict?: string[]}} waiting */
 export function waitingIds(waiting) {
   const lines = [];
   const named = (label, ids) => { if ((ids || []).length) lines.push(label + ": " + ids.join(", ")); };
   named("claimed in another tree or session", waiting.claimed);
   named("closed on a branch not merged here", waiting.awaitingMerge);
   named("blocked only by those", waiting.behind);
+  named("held back only by a conflict group those hold", waiting.conflict);
   return lines;
 }
 
