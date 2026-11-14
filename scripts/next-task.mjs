@@ -339,11 +339,16 @@ export function parkedByRun(root, records, config) {
 }
 
 export function isUnblocked(task, byId, archived, config) {
+  return awaitsBlockers(task, archived, config) && isExecutable(task, byId, archived);
+}
+
+/** A task in a protected status that names blockers: the ones `isUnblocked`
+ *  hands out once those close. PURE. */
+function awaitsBlockers(task, archived, config) {
   const protectedOnes = new Set(config.reasonRequiredStatuses || []);
   if (!protectedOnes.has(task.status)) return false;
   if (archived.has(task.status)) return false;
-  if (!(task.blocked_by || []).length) return false;
-  return isExecutable(task, byId, archived);
+  return (task.blocked_by || []).length > 0;
 }
 
 /**
@@ -452,7 +457,10 @@ export function heldElsewhere(task, handedOut) {
  * projection subtracts it, because a blocker inside the wave is work the run
  * closes first, while a question waits for a person whatever the run does.
  *
- * @returns {{candidates: object[], reclaimable: Set<string>, skippedBlocked: number,
+ * `admitted` is the upper-cased ids this call would hand out once their
+ * blockers close — see the comment at the unblocked pool (TL-741).
+ *
+ * @returns {{candidates: object[], reclaimable: Set<string>, admitted: Set<string>, skippedBlocked: number,
  *            skippedAsked: number, skippedOutsideWave: number, skippedUnplanned: number|null,
  *            skippedElsewhere: Array<{id: string, elsewhere: object[]}>,
  *            skippedConflict: Array<{id: string, group: string[], heldBy: object[]}>}}
@@ -719,15 +727,24 @@ export function selectCandidates(records, config, filters, now) {
   // merged BEFORE the sort rather than appended after it — a discharged P1 is
   // ready work, and burying it under every `pending` P3 would leave the queue
   // stuck in a slower way.
+  //
+  // `admitted` is every task this call would hand out once its blockers close
+  // (TL-741): what passed every gate up to here except the blocker one. It is
+  // collected from the same two pools rather than judged again elsewhere, so
+  // `waveWaiting` cannot call a wave waiting on a task this caller's role,
+  // executor or size filters would never be handed.
   const unblocked = new Set();
+  const admitted = new Set(matching.map((t) => String(t.id).toUpperCase()));
   if (!filters.status) {
     for (const t of filterTasks(records, { ...filters, status: null }, archived)) {
-      if (!isUnblocked(t, byId, archived, config)) continue;
       // A PARK IS NOT A BLOCKER WAIT (TL-282). The caller reads the marker off
       // the log and hands the set in, because this function is pure and the
       // answer lives outside the task file — in the transition that wrote the
       // status, not in the status itself.
       if (filters.parkedByRun && filters.parkedByRun.has(String(t.id).toUpperCase())) continue;
+      if (!awaitsBlockers(t, archived, config)) continue;
+      admitted.add(String(t.id).toUpperCase());
+      if (!isExecutable(t, byId, archived)) continue;
       unblocked.add(String(t.id).toUpperCase());
       fresh.push(t);
     }
@@ -852,7 +869,7 @@ export function selectCandidates(records, config, filters, now) {
     candidates.push(...stale);
   }
   return {
-    candidates, reclaimable, unblocked, skippedElsewhere, skippedExecutor, skippedHandedBack,
+    candidates, reclaimable, unblocked, admitted, skippedElsewhere, skippedExecutor, skippedHandedBack,
     skippedDeadlocked, skippedSize, skippedOutsideWave, skippedUnplanned, skippedConflict,
     // The count is of tasks that MATCHED and were held back by an open blocker;
     // the unblocked ones were never in `matching`, so they must not be
@@ -911,6 +928,14 @@ export const WAVE_AWAITS_MERGE = "wave-awaits-merge";
  * in the rest, the answer stays `nothing-to-take`, and `skippedConflict`
  * still names the holder for the coordinator, who owns the plan, to settle.
  *
+ * A BLOCKED TASK THIS CALLER WOULD NEVER BE HANDED does not wait either
+ * (TL-741). `behind` counts a task only when `admitted` — the set
+ * `selectCandidates` returns for the active wave, past its role, executor,
+ * size and status gates — holds it, so a wave [A claimed elsewhere, B blocked
+ * by A with a role the caller does not serve] stays `nothing-to-take`: the
+ * caller would poll a wave that can never hand it anything. Without `admitted`
+ * (null) every blocked task is judged on its blockers alone.
+ *
  * The kind is `wave-claimed-elsewhere` while any task is claimed, because a
  * merge alone does not free a claim; `wave-awaits-merge` when the merge is all
  * that is missing.
@@ -921,9 +946,10 @@ export const WAVE_AWAITS_MERGE = "wave-awaits-merge";
  * @param {Iterable<string>} heldIds ids a reservation held during this call
  * @param {Array<{id: string, heldBy: Array<{id: string}>}>} [conflictHeld] the
  *   active wave's `skippedConflict`
+ * @param {Set<string>|null} [admitted] the active wave's `admitted`, or null
  * @returns {{kind: string|null, claimed: string[], awaitingMerge: string[], behind: string[], conflict: string[]}}
  */
-export function waveWaiting(waveIds, records, config, heldIds, conflictHeld = []) {
+export function waveWaiting(waveIds, records, config, heldIds, conflictHeld = [], admitted = null) {
   const archived = new Set(config.archivedStatuses);
   const inProgress = inProgressStatus(config);
   const byId = new Map(records.map((t) => [String(t.id).toUpperCase(), t]));
@@ -971,7 +997,7 @@ export function waveWaiting(waveIds, records, config, heldIds, conflictHeld = []
         .map((b) => String(b).toUpperCase())
         .filter((b) => !blockerResolved(byId.get(b), archived));
       const holders = holdersOf.get(key) || [];
-      if (unresolved.length && unresolved.every((b) => waiting.has(b))) {
+      if (unresolved.length && unresolved.every((b) => waiting.has(b)) && (!admitted || admitted.has(key))) {
         behind.push(t.id);
       } else if (holders.length && holders.every((h) => waiting.has(h))) {
         conflict.push(t.id);
@@ -1150,6 +1176,7 @@ export function run(argv) {
   // The ACTIVE wave's conflict holds, kept before a spill replaces `selection`
   // with a later wave's: `waveWaiting` judges the active wave from them.
   const activeConflict = selection.skippedConflict;
+  const activeAdmitted = selection.admitted;
   // THE WAVE THE PLAN SAYS IS ACTIVE, kept apart from the one this call draws
   // from (TL-683): a spill draws from a later wave, and the refusal below still
   // has to judge whether the ACTIVE one is waiting.
@@ -1163,7 +1190,7 @@ export function run(argv) {
   // somebody is working in.
   let spill = null;
   if (plan.spill && activeWave && !selection.candidates.length) {
-    const waiting = waveWaiting(activeWave.ids, records, config, [], activeConflict);
+    const waiting = waveWaiting(activeWave.ids, records, config, [], activeConflict, activeAdmitted);
     if (waiting.kind) {
       const later = spillWave(planned, records, {
         archivedStatuses: config.archivedStatuses,
@@ -1457,7 +1484,7 @@ export function run(argv) {
   // A WAVE THAT IS WAITING IS NOT AN EMPTY BACKLOG (TL-683). Judged against
   // the ACTIVE wave, also after a spill found nothing: that wave is still the
   // one whose arrival the caller is waiting for.
-  const waiting = activeWave ? waveWaiting(activeWave.ids, records, config, passedOver.map((p) => p.id), activeConflict) : null;
+  const waiting = activeWave ? waveWaiting(activeWave.ids, records, config, passedOver.map((p) => p.id), activeConflict, activeAdmitted) : null;
   const refusalKind = waiting && waiting.kind ? waiting.kind : "nothing-to-take";
   const refusal = waiting && waiting.kind
     ? "nothing to take now — plan wave " + (activeWave.index + 1) + " " + waitingPhrase(waiting.kind)
