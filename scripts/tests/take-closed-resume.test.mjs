@@ -18,6 +18,9 @@
  *      itself refuses.
  *   5. THE ROUTE IS RUN AS PRINTED and the briefing answers, so the pointer is
  *      worth what it promises.
+ *   6. THE SECOND ROUTE, `take --reopen` (TL-737), is printed after `resume`
+ *      for a closing rejected in review, and run as printed it reopens the
+ *      task — the refusal does not steer that caller away from the withdrawal.
  *
  * The refusal is `ownUnmergedClosing()` in `scripts/take-task.mjs`.
  */
@@ -90,14 +93,21 @@ test("an own closing that was never committed names resume", () => {
   assert.match(r.stderr, new RegExp("take: " + id + " is closed \\(status: done\\), by you, and `main` does not have that closing"));
   assert.match(r.stderr, /agent:a closed it at \d{4}-\d\d-\d\dT[\d:.]+Z; on `main` it is still `pending`\./);
   assert.match(r.stderr, /stopped before its commit or its merge/);
+  assert.match(r.stderr, new RegExp("→ \\S+ take " + id + " --reopen --reason \"…\" --actor agent:a"));
+  assert.ok(r.stderr.indexOf(" resume " + id) < r.stderr.indexOf(" take " + id + " --reopen"),
+    "the resume route is no longer the first suggestion: " + r.stderr);
   assert.doesNotMatch(r.stderr, /Reopen it deliberately/);
 
   const out = takeJson(dir, id, "agent:a");
   assert.equal(out.refusalKind, "closed-unmerged");
-  assert.equal(out.details.length, 4, out.details.join("\n"));
+  assert.equal(out.details.length, 6, out.details.join("\n"));
   assert.match(out.details[1], /stopped before its commit or its merge/);
-  assert.match(out.details[2], /^Do not reopen it — the closing stands\./);
-  assert.match(out.details[3], new RegExp(" resume " + id + " --actor agent:a$"));
+  assert.match(out.details[2], /^If so, the closing stands: finish it from the briefing \(the first route below\)\.$/);
+  assert.match(out.details[3], /^If the closing was rejected in review, withdraw it instead \(the second route\); the reason is recorded\.$/);
+  // The resume route stays FIRST (TL-684); the reopen route follows it (TL-737).
+  assert.match(out.details[4], new RegExp(" resume " + id + " --actor agent:a$"));
+  assert.match(out.details[5], new RegExp(" take " + id + " --reopen --reason \"…\" --actor agent:a$"));
+  assert.doesNotMatch(out.details.join("\n"), /Do not reopen/, "the advice contradicts the reopen route it prints");
 });
 
 test("a later write by somebody else does not hide whose closing it was", () => {
@@ -218,4 +228,25 @@ test("the resume route the refusal prints answers when run as printed", () => {
   const r = run(dir, printed[1].split(" ").concat(["--dir", "."]));
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /## Goal/);
+});
+
+test("the reopen route the refusal prints second reopens the task when run as printed", () => {
+  const { dir, id } = repo();
+  closeAs(dir, id, "agent:a");
+
+  const refusal = run(dir, ["take", id, "--dir", ".", "--actor", "agent:a"]).stderr;
+  const printed = refusal.match(/→ \S+ (take .+ --reopen .+)$/m);
+  assert.ok(printed, refusal);
+  // The placeholder is the one word a caller has to supply; everything else
+  // runs exactly as printed.
+  const args = printed[1].replace('"…"', "REASON").split(" ")
+    .map((a) => (a === "REASON" ? "rejected in review" : a));
+  const r = run(dir, args.concat(["--dir", ".", "--json"]));
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.ok, true);
+  assert.equal(out.from, "done");
+  assert.equal(out.task.status, "in_progress");
+  const name = readdirSync(join(dir, "tasks")).find((f) => f.startsWith(id + "-"));
+  assert.match(readFileSync(join(dir, "tasks", name), "utf8"), /^status: in_progress/m);
 });

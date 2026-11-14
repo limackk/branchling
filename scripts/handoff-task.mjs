@@ -308,7 +308,10 @@ export function handoffTask(opts) {
     return {
       ok: false, kind: "closed", id,
       message: id + " is closed (status: " + record.status + ")",
-      details: ["A closed task has nobody waiting on it — reopen it deliberately first."],
+      details: ["A closed task has nobody waiting on it — reopen it deliberately first. The reason is recorded:"],
+      // The route that withdraws a closing is `take --reopen` (TL-714); the
+      // refusal names it as a command (TL-737) rather than as prose.
+      next: [N + " take " + id + " --reopen --reason \"…\" --actor " + actor],
     };
   }
 
@@ -674,10 +677,11 @@ export function run(argv) {
     if (plan.json) {
       printJson("task-handoff", {
         ok: false, id: result.id || plan.id, actorSource, refusalKind: result.kind,
-        refusal: result.message, details: result.details || [],
+        // The route is part of the details in JSON, as in `take`'s envelope.
+        refusal: result.message, details: (result.details || []).concat(result.next || []),
       });
     } else {
-      console.error(failure(N + " handoff", result.message, result.details || []));
+      console.error(failure(N + " handoff", result.message, result.details || [], result.next || []));
     }
     return refusalCode(result.kind);
   }

@@ -284,9 +284,17 @@ export function takeTask(opts) {
           actor + " closed it at " + (own.ts || "an unrecorded time") + "; on `" + own.base + "` it is " +
             (own.baseStatus ? "still `" + own.baseStatus + "`" : "absent") + ".",
           "The session that closed it stopped before its commit or its merge.",
-          "Do not reopen it — the closing stands. Finish it from the briefing:",
+          "If so, the closing stands: finish it from the briefing (the first route below).",
+          // A supervisor rejecting a closing in review leaves this same state
+          // in the loop's tree (TL-737), and the refusal is the one place that
+          // caller reads, so the withdrawal is named here, second and
+          // conditional, instead of being left to be found.
+          "If the closing was rejected in review, withdraw it instead (the second route); the reason is recorded.",
         ],
-        next: [N + " resume " + id + " --actor " + actor],
+        next: [
+          N + " resume " + id + " --actor " + actor,
+          N + " take " + id + " --reopen --reason \"…\" --actor " + actor,
+        ],
       };
     }
     return {
