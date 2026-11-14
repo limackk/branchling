@@ -94,6 +94,10 @@ export const KINDS = {
     delegation: null, allowUncontrolledDelegation: null, plan: null, order: [], considered: null,
     stoppedAt: null, stopped: null, agentNeverRan: null, waitingForRole: [],
     waitingForExecutor: [], waitingForSize: [], tally: null, sharedState: null, ms: null, tasks: [],
+    // `--dry-run --plan --spill` (TL-731): the waiting wave the projection
+    // walked past, in the shape `next --json` gives `plan.spill`; null when it
+    // walked past none. The live run reports its spill through `stopped`.
+    spill: null,
     // What `--dry-run` declined because THIS actor handed it back (TL-239),
     // under the name `next --json` already gives the same list: the two paths
     // answer about one queue, so a consumer reads one key for one fact.
