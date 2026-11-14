@@ -39,7 +39,9 @@
  *                           waiting, and a wall met after the spill, still stop
  *                           it; a free task in the waiting wave is projected
  *                           first, because the live run takes it before `next`
- *                           calls that wave waiting.
+ *                           calls that wave waiting. A blocked task the
+ *                           run's roles never serve does not make the wave
+ *                           waiting (TL-743), as it does not for `next`.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -543,6 +545,42 @@ test("run --dry-run --spill: a wave blocked by a later wave's task is not waitin
   assert.equal(report.spill, null, JSON.stringify(report.spill));
   assert.equal(report.stoppedAt.wave, 1);
   assert.deepEqual(report.order, []);
+});
+
+test("run --dry-run --spill judges a blocked wave task by the roles the run serves (TL-743)", () => {
+  // Wave 1 [a claimed elsewhere, b blocked by a, role: review]. A run serving
+  // `dev` is never handed b, so the live `next --role dev` calls the wave
+  // nothing-to-take and the run stops there; the projection must too. Served
+  // `review`, b waits behind a and the spill applies: the positive control that
+  // the tree IS the waiting case.
+  const f = tree({
+    setup: (t) => {
+      const cfg = join(t.backlog, "config.yaml");
+      writeFileSync(cfg, readFileSync(cfg, "utf8") + "\nroles: [dev, review]\n", "utf8");
+      claimedHere(t);
+      addTaskAndPlan(t, [["First", ["a", "b"]], ["Second", ["c"]]]);
+      setField(t.backlog, t.ids.b, "blocked_by", "[" + t.ids.a + "]");
+      setField(t.backlog, t.ids.b, "role", "review");
+    },
+  });
+  const hands = (role) => ["--spill", "--agent", worker(f.dir), "--agent-for", role + "=" + worker(f.dir)];
+  const live = (role) => JSON.parse(cli(["next", "--dir", f.backlog, "--actor", RUN_ACTOR, "--plan", "--spill",
+    "--dry-run", "--json", "--role", role], f.env).out);
+
+  const dev = dryJson(f, hands("dev"));
+  assert.equal(live("dev").refusalKind, "nothing-to-take", "the fixture is not the case it claims");
+  assert.equal(dev.spill, null, JSON.stringify(dev.spill));
+  assert.deepEqual(dev.order, []);
+  assert.equal(dev.stoppedAt.wave, 1, JSON.stringify(dev.stoppedAt));
+
+  const review = dryJson(f, hands("review"));
+  assert.equal(live("review").plan.spill.refusalKind, "wave-claimed-elsewhere");
+  assert.deepEqual(review.spill, {
+    from: 1, fromName: "First", refusalKind: "wave-claimed-elsewhere",
+    claimedElsewhere: [f.ids.a], awaitingMerge: [], wave: 2, name: "Second",
+  });
+  assert.deepEqual(review.order.map((r) => [r.id, r.wave]), [[f.ids.c, 2]]);
+  assert.equal(review.stoppedAt, null, JSON.stringify(review.stoppedAt));
 });
 
 test("run --dry-run --spill: a chain inside the spill wave is reachable when its head is free", () => {
