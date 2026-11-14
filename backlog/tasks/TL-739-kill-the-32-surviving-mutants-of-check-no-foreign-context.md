@@ -8,15 +8,15 @@ epic: ""                           # free text — the group this task counts to
 release: ""                        # the release it is PLANNED for (a value from `releases:` in config.yaml). Empty = none
 target: []                         # the deploy targets in ANOTHER repository it ships from (`deploy_targets` with `repository:`). Empty = none
 priority: P3  # P0 blocker | P1 critical | P2 nice | P3 backlog
-status: pending                    # pending | in_progress | blocked | done | cancelled
-owner: unassigned
+status: done  # pending | in_progress | blocked | done | cancelled
+owner: agent:loop-2
 role: ""                           # WHO MAY take it (a value from `roles:` in config.yaml); `owner:` is who holds it NOW. Empty = anybody
 executor: ""                       # human | agent — WHICH SPECIES may be HANDED it. `next` and `run` skip what they are not; `take <ID>` still works. Empty = either
 conflict_group: []                 # the AREA it touches (e.g. a module): `next` and `run` hold it back while a task of the same group is in progress. Empty = `conflict_group_from`, or none
 estimate: 2h                       # 30m | 1h | 2h | 3h | 4h | 1d | 1w
 confidence: medium                 # how much you trust the estimate
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-14
 blocked_by: []                     # ids of tasks that MUST be closed before this one starts
 blocks: []                         # ids this task will unblock
 related_docs: []                   # paths relative to the repository root
@@ -57,4 +57,22 @@ Compare findings with `assertNoFindings()` or another bounded assertion, never w
 
 ## Acceptance criteria
 
-- [ ] No mutant of check-no-foreign-context.mjs lines 123-216 survives except those named in this task as equivalent, and the tests stay green. [proof: foreign-context-tests]
+- [x] No mutant of check-no-foreign-context.mjs lines 123-216 survives except those named in this task as equivalent, and the tests stay green. [proof: foreign-context-tests]
+
+## Equivalent mutants
+
+A rerun of the line-range run on 2026-11-14 left four of 129 mutants alive,
+each named here as equivalent: it differs from the code only for a text that
+literally contains Stryker's placeholder string, which is not a property of
+the guard (the same reasoning as viewer-field-editors.test.mjs).
+
+- line 123, the `words = []` default of `auditText` as `["Stryker was here"]`;
+- line 124, the `String(text || "")` fallback as `"Stryker was here!"`;
+- line 125, `(words || [])` as `["Stryker was here"]`;
+- line 198, the `words = []` default of `auditTree` as `["Stryker was here"]`.
+
+The test written for the `filter(Boolean)` survivor on line 125 also exposed
+a defect: with an empty word ahead of a real one, a finding's reason named the
+word at the same index of the UNFILTERED list (`word:` instead of
+`word:northwind`). The reason now indexes the filtered list it was compiled
+from.

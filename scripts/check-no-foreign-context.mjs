@@ -122,8 +122,8 @@ export function stripLinkTargets(line) {
  */
 export function auditText(text, words = [], { measurements = true } = {}) {
   const lines = String(text || "").split(/\r?\n/);
-  const forbidden = (words || []).filter(Boolean)
-    .map((w) => new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i"));
+  const listed = (words || []).filter(Boolean);
+  const forbidden = listed.map((w) => new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i"));
   const problems = [];
   // A line of a fenced block, and the fence itself, are not prose. A command
   // that PRINTS a big number is the replacement this guard is asking for, so
@@ -149,7 +149,7 @@ export function auditText(text, words = [], { measurements = true } = {}) {
     const searched = stripLinkTargets(line);
     for (let w = 0; w < forbidden.length; w++) {
       if (forbidden[w].test(searched)) {
-        problems.push({ line: i + 1, text: line.trim(), reason: "word:" + words[w] });
+        problems.push({ line: i + 1, text: line.trim(), reason: "word:" + listed[w] });
         break;
       }
     }
