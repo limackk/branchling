@@ -19,7 +19,9 @@
  *
  * WHAT IT DOES NOT COVER. When Stryker kills this process itself with SIGKILL
  * on a timeout, nothing here runs. `sweepLeftovers()` in `mutation-run.mjs`
- * catches that case when the run ends.
+ * catches that case when the run ends. Nor does it give a test it kills the
+ * chance to remove its fixtures: SIGKILL runs no code, so the run removes the
+ * temporary directory it gave the command instead (TL-746).
  *
  * The exit status is the command's own, so Stryker's verdict is unchanged.
  * Not shipped: `package.json` excludes it with `mutation-run.mjs`.

@@ -188,13 +188,17 @@
  * still names the run's directory is killed with its group and reported,
  * because a process nobody reports is found only by somebody running `pgrep`.
  *
+ * NO FIXTURE OF A KILLED TEST OUTLIVES IT EITHER (TL-746). Every test command
+ * runs with a temporary directory inside the run's own, so what a test file
+ * stopped by SIGKILL could not remove goes with the run; see `privateTmpEnv`.
+ *
  * Tests: scripts/tests/mutation-run.test.mjs (scope and selection, no Stryker),
  *        scripts/tests/mutation/subprocess-kill.test.mjs (a real run),
  *        scripts/tests/mutation/no-orphan-processes.test.mjs (nothing left behind).
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { constants as osConstants, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
@@ -862,6 +866,33 @@ export async function countMutants(root, mutate, instrumenter) {
   return { total, files };
 }
 
+/** The variables `os.tmpdir()` reads: `TMPDIR` on POSIX, `TEMP` and `TMP` on Windows. */
+const TMPDIR_VARS = ["TMPDIR", "TEMP", "TMP"];
+
+/**
+ * `env` with its temporary directory moved to `dir`, which the caller made
+ * and removes (TL-746).
+ *
+ * WHY. A test file stopped inside a mutation run is stopped by SIGKILL, and
+ * SIGKILL runs no cleanup: Stryker ends a timed-out mutant with `tree-kill`
+ * and SIGKILL down the whole process tree, `mutation-contain.mjs` reaps its
+ * group with SIGKILL, and the data cap aborts. Each such test file left its
+ * per-process fixture directory (`tests/_fixture-dir.mjs`) in the machine's
+ * temporary directory. A temporary directory of the run's own,
+ * removed when the run returns, takes whatever a killed test left with it.
+ *
+ * Rejected: SIGTERM before SIGKILL in `mutation-contain.mjs`, which never
+ * sees the Stryker timeout, the commonest stop; and removing the directories
+ * of the PIDs the run killed, which it does not know, because Stryker kills
+ * them. A sweep of the shared temporary directory by name is ruled out by
+ * `_fixture-dir.mjs`: another worktree's run owns the same prefixes.
+ */
+export function privateTmpEnv(env, dir) {
+  const copy = { ...env };
+  for (const name of TMPDIR_VARS) copy[name] = dir;
+  return copy;
+}
+
 /**
  * One run of `testFiles` as Stryker's command runner makes it — in its own
  * process group, in the environment Stryker is handed — timed. A failing run
@@ -869,15 +900,22 @@ export async function countMutants(root, mutate, instrumenter) {
  *
  * A run still going after `limitSeconds` is stopped — SIGTERM to the
  * containment wrapper, which kills its whole process group — and reported
- * `cut`, with `passed: null`, since no verdict was reached.
+ * `cut`, with `passed: null`, since no verdict was reached. The run has a
+ * temporary directory of its own, removed when it returns (`privateTmpEnv`).
  */
 export function timeTests(root, testFiles, { limitSeconds = Infinity } = {}) {
   const started = performance.now();
   const bounded = Number.isFinite(limitSeconds);
-  const r = spawnSync(process.execPath, [CONTAIN_ENTRY, process.execPath, ...workerTestArgs(testFiles)], {
-    cwd: root, env: strykerEnv(process.env, root), stdio: "ignore",
-    ...(bounded ? { timeout: Math.max(1, Math.ceil(limitSeconds * 1000)), killSignal: "SIGTERM" } : {}),
-  });
+  const testTmp = mkdtempSync(join(tmpdir(), "mutation-time-"));
+  let r;
+  try {
+    r = spawnSync(process.execPath, [CONTAIN_ENTRY, process.execPath, ...workerTestArgs(testFiles)], {
+      cwd: root, env: privateTmpEnv(strykerEnv(process.env, root), testTmp), stdio: "ignore",
+      ...(bounded ? { timeout: Math.max(1, Math.ceil(limitSeconds * 1000)), killSignal: "SIGTERM" } : {}),
+    });
+  } finally {
+    rmSync(testTmp, { recursive: true, force: true, maxRetries: 3 });
+  }
   const seconds = (performance.now() - started) / 1000;
   if (r.error && r.error.code === "ETIMEDOUT") return { seconds, passed: null, cut: true };
   return { seconds, passed: r.status === 0, cut: false };
@@ -1250,7 +1288,10 @@ export async function runStryker(root, p, opts, slot, stryker = strykerBin, swee
   for (const s of CLEANUP_SIGNALS) process.on(s, onSignal);
   const links = directorySymlinks(root);
   const work = mkdtempSync(join(tmpdir(), "mutation-run-"));
+  // Inside `work`, so the removal below takes what a killed test left there.
+  const testTmp = join(work, "tmp");
   try {
+    mkdirSync(testTmp);
     const config = strykerConfig(p, opts, links, work);
     const reportPath = config.jsonReporter.fileName;
     const configPath = join(work, "stryker.config.json");
@@ -1260,7 +1301,7 @@ export async function runStryker(root, p, opts, slot, stryker = strykerBin, swee
       child = spawn(process.execPath, [bin, "run", configPath], {
         cwd: root,
         // The token lets a run a test starts inside this one share its slot.
-        env: { ...strykerEnv(process.env, root), [SLOT_TOKEN_ENV]: slot.token },
+        env: { ...privateTmpEnv(strykerEnv(process.env, root), testTmp), [SLOT_TOKEN_ENV]: slot.token },
         stdio: ["ignore", opts.json ? "pipe" : "inherit", opts.json ? "pipe" : "inherit"],
         detached: processTreeDetached(),
       });

@@ -24,7 +24,7 @@ import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, scriptSource, source
 import {
   ALLOCATION_FAILURE, DEFAULT_BUDGET_MINUTES, DEFAULT_MEMORY_CAP, MIN_SWEEP_MARKER, formatCap, memoryCapReport, parseMemoryCap, SOURCE_ROOT_ENV, STOP_GRACE_MS, countMutants, estimateSeconds, formatDuration, leftoverProcesses,
   SANDBOX_GIT_INIT, SILENT_LOGGER, keepReport, changedLineRanges, directorySymlinks, importClosure, loadInstrumenter, main, mutateDescriptions,
-  parseArgs, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, timingLimitSeconds, costReport, usage, workerTestArgs,
+  parseArgs, privateTmpEnv, reachesCli, runStryker, sandboxCommand, selectTests, strykerConfig, strykerEnv, summarise, sweepLeftovers, timeTests, timingLimitSeconds, costReport, usage, workerTestArgs,
 } from "../mutation-run.mjs";
 import {
   SLOT_TOKEN_ENV, WORKER_TEST_FILES, cgroupHeadroom, chooseConcurrency, describeHolder, releaseSlot, slotPath, testFileConcurrency, tryAcquireSlot,
@@ -1479,6 +1479,33 @@ test("a timed run still going at its limit is stopped with its process group, an
     const deadline = Date.now() + 5000;
     while (alive(pid) && Date.now() < deadline) spawnSync("sleep", ["0.1"]);
     assert.equal(alive(pid), false, "the test process " + pid + " outlived the cut run");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a private temporary directory replaces every variable os.tmpdir() reads, on POSIX and on Windows (TL-746)", () => {
+  const env = { PATH: "/bin", TMPDIR: "/shared", TEMP: "C:\\shared", TMP: "C:\\shared" };
+  assert.deepEqual(privateTmpEnv(env, "/run/tmp"), { PATH: "/bin", TMPDIR: "/run/tmp", TEMP: "/run/tmp", TMP: "/run/tmp" });
+  assert.equal(env.TMPDIR, "/shared", "the caller's environment was changed");
+});
+
+test("a timed run that is cut leaves no fixture of its killed test in the temporary directory (TL-746)", () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-cut-tmp-"));
+  const witness = join(root, "made");
+  try {
+    write(root, "scripts/tests/mutation/slow.test.mjs", 'import { test } from "node:test";\n'
+      + 'import { mkdtempSync, writeFileSync } from "node:fs";\nimport { tmpdir } from "node:os";\nimport { join } from "node:path";\n' // fixture-dir: allow
+      + 'writeFileSync(' + JSON.stringify(witness) + ', mkdtempSync(join(tmpdir(), "branchling-test-pid" + process.pid + "-")));' // fixture-dir: allow
+      + "\n" + 'test("outlives the plan", () => new Promise((r) => setTimeout(r, 300000)));\n');
+    const r = timeTests(root, ["scripts/tests/mutation/slow.test.mjs"], { limitSeconds: 2 });
+    assert.equal(r.cut, true, "the run was not cut: " + JSON.stringify(r));
+    // POSITIVE CONTROL: the killed file made its fixture, in a directory of the run's own.
+    assert.ok(existsSync(witness), "the slow test never made its fixture");
+    const made = readFileSync(witness, "utf8");
+    assert.notEqual(dirname(made), tmpdir(), "the test command was given the shared temporary directory: " + made);
+    assert.equal(existsSync(made), false, "the killed test's fixture outlived the timed run: " + made);
+    assert.equal(existsSync(dirname(made)), false, "the timed run's temporary directory was left: " + dirname(made));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

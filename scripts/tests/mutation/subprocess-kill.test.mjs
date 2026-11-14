@@ -20,12 +20,18 @@
  * result is never asserted, so its mutants must SURVIVE: without that negative
  * half, "everything killed" could equally mean the run killed everything
  * regardless of the tests.
+ *
+ * A KILLED TEST LEAVES NO FIXTURE (TL-746). Every stop inside a mutation run
+ * is a SIGKILL, which runs no cleanup, so the run hands each test command a
+ * temporary directory of its own and removes it. The last test below makes
+ * mutants HANG, so that Stryker's timeout kills the test files that made
+ * them, and asserts that the run's TMPDIR is empty afterwards.
  */
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "../_fixture-dir.mjs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -167,6 +173,73 @@ test("the linked file and its sibling are both there", () => {
     const out = JSON.parse(r.stdout);
     assert.ok(out.files["scripts/lib.mjs"].Killed > 0, "nothing killed: " + r.stdout);
     assert.equal(out.noCoverage, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// TL-746. `ready()` returning anything but true makes the test wait forever,
+// so a mutant of it is stopped by Stryker's timeout — `tree-kill` with
+// SIGKILL, which runs no cleanup — after its test file made a fixture in the
+// temporary directory. An unmutated run removes its fixture itself, as
+// `fixtureDir` does on exit, so whatever is left would be a killed file's.
+// Each test process records the directory it made in a witness directory
+// outside every TMPDIR the run sees: the positive control that fixtures were
+// made, where, and by more processes than finished.
+const READY = `export function ready() {
+  return true;
+}
+`;
+
+const WAITS = `import { test } from "node:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"; // fixture-dir: allow
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ready } from "../ready.mjs";
+
+test("waits until ready", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "branchling-test-pid" + process.pid + "-")); // fixture-dir: allow
+  writeFileSync(join(process.env.FIXTURE_WITNESS_DIR, String(process.pid)), dir);
+  while (!ready()) await new Promise((r) => setTimeout(r, 100));
+  rmSync(dir, { recursive: true, force: true });
+});
+`;
+
+test("a test file killed by a mutant's timeout leaves no fixture directory in the run's TMPDIR", { timeout: 300_000 }, () => {
+  const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-leftover-"));
+  try {
+    const runTmp = join(root, "tmp");
+    const witness = join(root, "witness");
+    const repo = join(root, "repo");
+    mkdirSync(runTmp);
+    mkdirSync(witness);
+    write(repo, "scripts/tests/waits.test.mjs", WAITS);
+    write(repo, "scripts/ready.mjs", "export function ready() {}\n");
+    sh(repo, "git", ["init", "-q"]);
+    sh(repo, "git", ["add", "-A"]);
+    sh(repo, "git", ["commit", "-q", "-m", "base"]);
+    sh(repo, "git", ["switch", "-q", "-c", "feature"]);
+    write(repo, "scripts/ready.mjs", READY);
+
+    const r = spawnSync(process.execPath, [ENTRY, "--base", "main", "--json", "--concurrency", "2"], {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: runTmp, TEMP: runTmp, TMP: runTmp, FIXTURE_WITNESS_DIR: witness },
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr.slice(-3000));
+    const out = JSON.parse(r.stdout);
+    const counts = out.files["scripts/ready.mjs"];
+    assert.ok(counts && counts.Timeout > 0, "no mutant timed out, so no test file was killed: " + r.stdout);
+
+    // POSITIVE CONTROL: fixtures were made, inside the TMPDIR this run was
+    // given, by more test files than the run alone (the dry run) accounts for.
+    const made = readdirSync(witness).map((pid) => readFileSync(join(witness, pid), "utf8"));
+    assert.ok(made.length > counts.Timeout, "fewer fixtures than runs: " + JSON.stringify(made));
+    for (const dir of made) {
+      assert.ok(dir.startsWith(runTmp + "/"), "a fixture was made outside the run's TMPDIR: " + dir);
+      assert.equal(existsSync(dir), false, "a killed test file's fixture outlived the run: " + dir);
+    }
+    assert.deepEqual(readdirSync(runTmp), [], "the run left entries in its TMPDIR");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

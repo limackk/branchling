@@ -57,7 +57,10 @@
  *     fixture asked for at the top of the temporary directory is therefore
  *     made inside ONE directory per process, `branchling-test-pid<PID>-*`, so
  *     what a killed process leaves is a single entry that names it, not
- *     hundreds. A prefix anywhere else is honoured as given.
+ *     hundreds. A prefix anywhere else is honoured as given. Inside a
+ *     mutation run that entry goes too: the run gives every test command a
+ *     temporary directory of its own and removes it (TL-746,
+ *     `privateTmpEnv` in `mutation-run.mjs`).
  *
  * A third path was found by measurement, not by reading: a test file whose
  * RUNNER is killed (a session or a Bash call cut off kills `node --test`, not
