@@ -26,8 +26,27 @@
  *
  * `scripts/tests/fixture-dir.test.mjs` holds the rule that a test file never
  * calls `mkdtempSync` itself.
+ *
+ * A FIXTURE TREE'S LOCK STATE IS A FIXTURE TOO (TL-735). `scripts/lock.mjs`
+ * keeps reservations in the per-user state directory, keyed by the tree they
+ * belong to, and nothing ever removes the directory a fixture repository's
+ * locks were written to. Measured on 2026-11-14: one run of the suite left 64
+ * of those directories in the developer's real state directory, the one the
+ * developer's own sessions read their locks from. The first fixture this
+ * process makes therefore also points `BACKLOG_STATE_DIR` at a directory of
+ * its own, removed with the rest at exit, so every fixture tree a test makes
+ * through here — and every CLI the test spawns with `process.env` — locks
+ * there instead. It is done HERE and not in a helper each file has to call,
+ * because the leak came from the files for which the lock was a side effect,
+ * which are exactly the ones that would not have called it. A variable the
+ * test already set (`isolateState`, or the environment the suite was started
+ * with) is left alone; `scripts/tests/suite-state-leak.test.mjs` is the guard.
  */
 import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { STATE_DIR_ENV } from "../lock.mjs";
 
 const created = new Set();
 let hooked = false;
@@ -51,11 +70,26 @@ function removeAll() {
  * idempotent.
  */
 export function fixtureDir(prefix, options) {
-  const dir = mkdtempSync(prefix, options);
+  const dir = track(mkdtempSync(prefix, options));
+  isolateFixtureState();
+  return dir;
+}
+
+function track(dir) {
   created.add(dir);
   if (!hooked) {
     hooked = true;
     process.once("exit", removeAll);
   }
   return dir;
+}
+
+/**
+ * Point this process, and every child that inherits its environment, at a
+ * throwaway state directory — once, and only when nothing has chosen one yet.
+ */
+export function isolateFixtureState(env = process.env) {
+  if (env[STATE_DIR_ENV]) return env[STATE_DIR_ENV];
+  env[STATE_DIR_ENV] = track(mkdtempSync(join(tmpdir(), "branchling-test-fixture-state-")));
+  return env[STATE_DIR_ENV];
 }
