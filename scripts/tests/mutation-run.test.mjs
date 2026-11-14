@@ -321,6 +321,13 @@ test("--help names every accepted flag with a description and exits 0", () => {
     }
     assert.equal(columns.size, 1, "descriptions start in one column");
     assert.match(out, new RegExp("^  --budget <minutes> +.*\\(default: " + DEFAULT_BUDGET_MINUTES + "\\)$", "m"));
+    // TL-738: the plan times one run of the selected tests (TL-682, TL-716),
+    // so its line says so instead of claiming it runs nothing.
+    const planLine = out.split("\n").find((l) => l.startsWith("  --plan "));
+    assert.doesNotMatch(planLine, /run nothing|without running anything/, planLine);
+    assert.match(planLine, /runs the selected tests once/, planLine);
+    assert.match(planLine, /puts the estimate past the budget/, planLine);
+    assert.match(planLine, /starts no Stryker run/, planLine);
   }
   // --help wins over the flags around it, so it never starts a run.
   const late = run(HOME, ["--plan", "--help"]);

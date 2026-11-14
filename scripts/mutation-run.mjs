@@ -257,7 +257,7 @@ const FLAG_HELP = {
   "--budget": ["<minutes>", "refuse a run whose estimate exceeds this (default: " + DEFAULT_BUDGET_MINUTES + ")"],
   "--keep-report": ["<path>", "copy Stryker's mutation.json to this path before the run's directory is removed"],
   "--memory-cap": ["<size>", "data cap (ulimit -d) of every test process, e.g. 512M or 4G (default: " + DEFAULT_MEMORY_CAP + "; none or 0 disables; not enforced on macOS)"],
-  "--plan": ["", "print the modules, the selected tests, the mutant count and the estimate; run nothing"],
+  "--plan": ["", "print the modules, the selected tests, the mutant count and the estimate; runs the selected tests once to time them, stopped as soon as that run alone puts the estimate past the budget; starts no Stryker run"],
   "--json": ["", "print the plan or the result as JSON on stdout"],
   "--named-only": ["", "select only the test files that name the module: a fast lower bound"],
   "--changed-lines": ["", "mutate only the lines this branch added or changed, not whole modules"],

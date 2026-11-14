@@ -162,8 +162,10 @@ pinned devDependency); the default suite and CI do not.
   module it does not finish in the time a session or a supervised loop has,
   and a run cut off by a timeout settles nothing. A new, untracked module is
   mutated whole either way. `--plan` prints the mutant count and the
-  estimate without running anything, and a run whose estimate exceeds
-  `--budget` is refused before Stryker starts (TL-682).
+  estimate and starts no Stryker run, but it does run the selected tests
+  once to time them (TL-682), stopped as soon as that run alone puts the
+  estimate past `--budget` (TL-716); a run whose estimate exceeds
+  `--budget` is refused before Stryker starts.
 - **What a changed-lines run leaves unmeasured.** A mutant whose location
   spans a changed line and an unchanged one — a function body replaced
   whole, a multi-line expression edited on one of its lines — is never
