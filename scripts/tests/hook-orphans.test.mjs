@@ -31,7 +31,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { fixtureDir } from "./_fixture-dir.mjs";
-import { git } from "./_git.mjs";
+import { containedGroupProbe, git } from "./_git.mjs";
 import { isolateHome, isolateState, plainOutput, posixPath, SCRIPTS_DIR } from "./_repo.mjs";
 
 isolateHome("hook-orphans");
@@ -111,6 +111,13 @@ function kill(processes) {
 }
 
 test("a hook test whose git call times out leaves no hook, CLI or server process alive", { skip: !POSIX }, async () => {
+  // Asked first, under a deadline the wrapper cannot catch (TL-740): when the
+  // contained git does not lead its own group, its orphaned hook holds the
+  // wrapper's pipes open, the wrapper outlives the timeout below, and this
+  // test would wait on it with no end instead of failing.
+  const probe = containedGroupProbe();
+  assert.ok(probe.pid && probe.pgid === probe.pid,
+    "the contained command does not lead its own process group, so the commit below would hang:\n" + probe.output);
   const dir = await fixture();
   const r = git(dir, ["commit", "-qm", "never lands"], { timeout: GIT_TIMEOUT_MS });
   assert.equal(r.error?.code, "ETIMEDOUT", "git returned instead of timing out — the fixture hook did not hang:\n" +
