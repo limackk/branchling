@@ -129,7 +129,7 @@ waves:
   # (TL-665, TL-667, TL-672, TL-674, and TL-673 and TL-676 in the mutation
   # group) come last, so they serialise on one machine.
   - name: "The follow-ups filed in waves 9 and 10 close"
-    tasks: [TL-664, TL-660, TL-668, TL-663, TL-666, TL-669, TL-671, TL-675, TL-670, TL-665, TL-667, TL-672, TL-674, TL-673, TL-677, TL-678, TL-679, TL-680, TL-684, TL-685, TL-686, TL-688, TL-689, TL-690, TL-691, TL-692, TL-693, TL-694, TL-695, TL-698, TL-700, TL-701, TL-703, TL-704, TL-705, TL-706, TL-707, TL-708, TL-709, TL-710, TL-711, TL-712, TL-714, TL-715, TL-716, TL-717, TL-687, TL-718, TL-719, TL-720, TL-713, TL-724, TL-722, TL-725, TL-726, TL-727, TL-728, TL-732, TL-729, TL-730, TL-731, TL-734, TL-735, TL-733, TL-736, TL-737, TL-738, TL-739, TL-740, TL-741, TL-742, TL-743, TL-744]
+    tasks: [TL-664, TL-660, TL-668, TL-663, TL-666, TL-669, TL-671, TL-675, TL-670, TL-665, TL-667, TL-672, TL-674, TL-673, TL-677, TL-678, TL-679, TL-680, TL-684, TL-685, TL-686, TL-688, TL-689, TL-690, TL-691, TL-692, TL-693, TL-694, TL-695, TL-698, TL-700, TL-701, TL-703, TL-704, TL-705, TL-706, TL-707, TL-708, TL-709, TL-710, TL-711, TL-712, TL-714, TL-715, TL-716, TL-717, TL-687, TL-718, TL-719, TL-720, TL-713, TL-724, TL-722, TL-725, TL-726, TL-727, TL-728, TL-732, TL-729, TL-730, TL-731, TL-734, TL-735, TL-733, TL-736, TL-737, TL-738, TL-739, TL-740, TL-741, TL-742, TL-743, TL-744, TL-745]
 
   # The viewer touches build-viewer.mjs and serve-backlog.mjs only, so it can
   # run beside the follow-up waves above rather than after them. Both halves exist
