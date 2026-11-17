@@ -1,0 +1,2 @@
+{"id":"01M7K44ZK71SMCKV1XZWG6YCPF","ts":"2026-11-16T21:27:59.847Z","task":"TL-755","field":"__created__","from":"","to":"A seal commits to its held-out checks by digest","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M7K452E6W3WNZY33QH083H05","ts":"2026-11-16T21:28:02.758Z","task":"TL-755","field":"blocked_by","from":[],"to":["TL-747"],"actor":"agent:claude","source":"set","reason":"it builds on what TL-747 adds"}

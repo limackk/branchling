@@ -1,0 +1,2 @@
+{"id":"01M7K44WE3HWY2AZFTYSYWN70X","ts":"2026-11-16T21:27:56.611Z","task":"TL-747","field":"__created__","from":"","to":"A sealed contract changes only through a recorded amendment","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M7K453B8YG62FW72JR3K10BS","ts":"2026-11-16T21:28:03.688Z","task":"TL-747","field":"blocks","from":[],"to":["TL-749","TL-750","TL-755","TL-756"],"actor":"agent:claude","source":"set","reason":"TL-749 and TL-750 and TL-755 and TL-756 build on what this adds"}

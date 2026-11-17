@@ -1,0 +1,2 @@
+{"id":"01M7K44WT7KMK83X8GPX1451HZ","ts":"2026-11-16T21:27:56.999Z","task":"TL-748","field":"__created__","from":"","to":"done --dry-run --base runs a contract on the base tree","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M7K453VJ3V42VHQ04F6A5BAA","ts":"2026-11-16T21:28:04.210Z","task":"TL-748","field":"blocks","from":[],"to":["TL-749"],"actor":"agent:claude","source":"set","reason":"TL-749 builds on what this adds"}

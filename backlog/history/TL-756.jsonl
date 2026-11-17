@@ -1,0 +1,2 @@
+{"id":"01M7K4503QMRCMS0VVNMPWYR7V","ts":"2026-11-16T21:28:00.375Z","task":"TL-756","field":"__created__","from":"","to":"A contract approved by the task's executor is refused","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M7K452WN6J4AHPPSBSHQXB8C","ts":"2026-11-16T21:28:03.221Z","task":"TL-756","field":"blocked_by","from":[],"to":["TL-747"],"actor":"agent:claude","source":"set","reason":"it builds on what TL-747 adds"}
