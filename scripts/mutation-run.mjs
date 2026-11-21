@@ -175,8 +175,11 @@
  * Under the cap such a process fails its allocation within seconds, while the
  * whole suite's largest process peaked at about 121 MB. RLIMIT_DATA counts
  * only writable private mappings, so V8's PROT_NONE reservations do not trip
- * it; RLIMIT_AS would, which is why it is not used. macOS does not enforce
- * RLIMIT_DATA, so there the cap is advisory, and `--help` says so. A mutant
+ * it; RLIMIT_AS would, which is why it is not used. macOS refuses
+ * `ulimit -d` outright ("Invalid argument", with the hard limit reported as
+ * unlimited) and would not enforce RLIMIT_DATA anyway, and so does Git Bash on
+ * Windows; there no cap is set and the run says so (TL-761), because setting
+ * it failed every test command. A mutant
  * killed by an allocation failure was detected by the cap, not by an
  * assertion, so it is named after the run, like a Timeout.
  *
@@ -260,7 +263,7 @@ const FLAG_HELP = {
   "--concurrency": ["<n>", "Stryker workers (default: chosen from free memory, at most half the cores)"],
   "--budget": ["<minutes>", "refuse a run whose estimate exceeds this (default: " + DEFAULT_BUDGET_MINUTES + ")"],
   "--keep-report": ["<path>", "copy Stryker's mutation.json to this path before the run's directory is removed"],
-  "--memory-cap": ["<size>", "data cap (ulimit -d) of every test process, e.g. 512M or 4G (default: " + DEFAULT_MEMORY_CAP + "; none or 0 disables; not enforced on macOS)"],
+  "--memory-cap": ["<size>", "data cap (ulimit -d) of every test process, e.g. 512M or 4G (default: " + DEFAULT_MEMORY_CAP + "; none or 0 disables; not set on macOS or Windows)"],
   "--plan": ["", "print the modules, the selected tests, the mutant count and the estimate; runs the selected tests once to time them, stopped as soon as that run alone puts the estimate past the budget; starts no Stryker run"],
   "--json": ["", "print the plan or the result as JSON on stdout"],
   "--named-only": ["", "select only the test files that name the module: a fast lower bound"],
@@ -318,11 +321,25 @@ export function formatCap(kib) {
   return kib + " KiB";
 }
 
+/**
+ * The platforms whose shell refuses `ulimit -d` outright, by the name the run
+ * prints: macOS, and Git Bash on Windows, both "Invalid argument" (TL-761).
+ */
+const REFUSES_DATA_CAP = { darwin: "macOS", win32: "Windows" };
+
+/** Whether a test command on `platform` can be started under `ulimit -d` (TL-761). */
+export function setsDataCap(platform = process.platform) {
+  return !Object.hasOwn(REFUSES_DATA_CAP, platform);
+}
+
 /** The line the run prints about the cap, beside its concurrency. */
 export function memoryCapReport(kib, platform = process.platform) {
   if (kib === null) return "memory cap: none (--memory-cap none): a runaway test process can take all the memory it reaches";
-  return "memory cap: " + formatCap(kib) + " of data per test process (ulimit -d)"
-    + (platform === "darwin" ? "; macOS does not enforce it, so here it is advisory" : "");
+  if (!setsDataCap(platform)) {
+    return "memory cap: none here: " + REFUSES_DATA_CAP[platform] + " refuses ulimit -d, so the " + formatCap(kib)
+      + " asked for is not set";
+  }
+  return "memory cap: " + formatCap(kib) + " of data per test process (ulimit -d)";
 }
 
 /** The hard RLIMIT_DATA of a shell started from here, in KiB; Infinity when unlimited or unknown. */
@@ -1074,17 +1091,18 @@ export function workerTestArgs(testFiles, fileConcurrency = testFileConcurrency(
  * process's version, so it must be the node that receives it.
  *
  * `memoryCap` (KiB) is set with `ulimit -d` right before them, so every test
- * process and everything it spawns inherits it (TL-726); `null` sets none.
+ * process and everything it spawns inherits it (TL-726); `null` sets none,
+ * and so does a platform whose shell refuses the limit (TL-761).
  */
 export function sandboxCommand(links, testFiles, contain = CONTAIN_ENTRY, fileConcurrency = testFileConcurrency(),
-  memoryCap = parseMemoryCap(DEFAULT_MEMORY_CAP)) {
+  memoryCap = parseMemoryCap(DEFAULT_MEMORY_CAP), platform = process.platform) {
   const steps = [SANDBOX_GIT_INIT];
   steps.push(...links.map((l) => {
     const p = shellQuote(l.path);
     const parent = shellQuote(dirname(l.path));
     return "{ mkdir -p " + parent + " && { ln -s " + shellQuote(l.target) + " " + p + " 2>/dev/null; [ -L " + p + " ]; }; }";
   }));
-  if (memoryCap !== null) steps.push("ulimit -d " + memoryCap);
+  if (memoryCap !== null && setsDataCap(platform)) steps.push("ulimit -d " + memoryCap);
   steps.push([process.execPath, contain, process.execPath, ...workerTestArgs(testFiles, fileConcurrency)].map(shellQuote).join(" "));
   return steps.join(" && ");
 }
@@ -1156,12 +1174,12 @@ export function sweepLeftovers(marker, { ps = null, kill = process.kill, self = 
 }
 
 /** The Stryker configuration for plan `p`, its work files under `work`. */
-export function strykerConfig(p, opts, links, work) {
+export function strykerConfig(p, opts, links, work, platform = process.platform) {
   return {
     testRunner: "command",
     commandRunner: {
       command: sandboxCommand(links, p.tests.map((t) => t.file), CONTAIN_ENTRY, testFileConcurrency(),
-        opts.memoryCap === undefined ? parseMemoryCap(DEFAULT_MEMORY_CAP) : opts.memoryCap),
+        opts.memoryCap === undefined ? parseMemoryCap(DEFAULT_MEMORY_CAP) : opts.memoryCap, platform),
     },
     coverageAnalysis: "off",
     mutate: p.mutate,

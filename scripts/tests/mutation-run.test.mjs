@@ -391,7 +391,7 @@ test("scriptSource reads the tree a mutation run names, and this one otherwise",
 });
 
 test("the test command runs inside the containing process group, under this process's node", () => {
-  const cmd = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs", 4);
+  const cmd = sandboxCommand([], ["scripts/tests/a.test.mjs"], "/x/contain.mjs", 4, undefined, "linux");
   assert.equal(cmd, SANDBOX_GIT_INIT + " && ulimit -d 4194304 && " + [process.execPath, "/x/contain.mjs", process.execPath, "--test", "--test-concurrency=4",
     "scripts/tests/a.test.mjs"].map((s) => "'" + s + "'").join(" "));
 });
@@ -466,16 +466,23 @@ test("the bound is passed only to a node that accepts --test-concurrency, and ne
 // the V8 heap in under a minute and the OOM killer took the whole terminal.
 test("the sandbox command sets the data cap right before node --test, and none leaves it out", () => {
   assert.equal(DEFAULT_MEMORY_CAP, "4G");
-  const capped = sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 524288);
+  const capped = sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 524288, "linux");
   const node = [process.execPath, "/c.mjs", process.execPath, "--test", "--test-concurrency=4", "t.test.mjs"].map((s) => "'" + s + "'").join(" ");
   assert.equal(capped, SANDBOX_GIT_INIT + " && ulimit -d 524288 && " + node);
-  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, null), SANDBOX_GIT_INIT + " && " + node);
-  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4), sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 4 * 1024 * 1024),
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, null, "linux"), SANDBOX_GIT_INIT + " && " + node);
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, undefined, "linux"),
+    sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 4 * 1024 * 1024, "linux"),
     "the default is 4 GiB in KiB, the unit ulimit -d takes");
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 524288), sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 524288, process.platform),
+    "without a platform, this one's");
+  // TL-761: macOS refuses `ulimit -d`, so a cap there failed every test command before node started.
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 524288, "darwin"), SANDBOX_GIT_INIT + " && " + node);
+  assert.equal(sandboxCommand([], ["t.test.mjs"], "/c.mjs", 4, 524288, "win32"), SANDBOX_GIT_INIT + " && " + node);
   const p = { mutate: ["scripts/lib.mjs"], tests: [{ file: "t.test.mjs" }] };
-  assert.match(strykerConfig(p, { concurrency: 1 }, [], "/work").commandRunner.command, / && ulimit -d 4194304 && /);
-  assert.match(strykerConfig(p, { concurrency: 1, memoryCap: 1024 }, [], "/work").commandRunner.command, / && ulimit -d 1024 && /);
-  assert.doesNotMatch(strykerConfig(p, { concurrency: 1, memoryCap: null }, [], "/work").commandRunner.command, /ulimit/);
+  assert.match(strykerConfig(p, { concurrency: 1 }, [], "/work", "linux").commandRunner.command, / && ulimit -d 4194304 && /);
+  assert.match(strykerConfig(p, { concurrency: 1, memoryCap: 1024 }, [], "/work", "linux").commandRunner.command, / && ulimit -d 1024 && /);
+  assert.doesNotMatch(strykerConfig(p, { concurrency: 1, memoryCap: null }, [], "/work", "linux").commandRunner.command, /ulimit/);
+  assert.doesNotMatch(strykerConfig(p, { concurrency: 1, memoryCap: 1024 }, [], "/work", "darwin").commandRunner.command, /ulimit/);
 });
 
 test("--memory-cap reads binary sizes, none and 0 disable it, anything else fails", () => {
@@ -501,9 +508,10 @@ test("the cap is printed in the unit a reader would write, and says where it is 
   assert.equal(formatCap(100), "100 KiB");
   assert.equal(memoryCapReport(4194304, "linux"), "memory cap: 4 GiB of data per test process (ulimit -d)");
   assert.equal(memoryCapReport(4194304, "darwin"),
-    "memory cap: 4 GiB of data per test process (ulimit -d); macOS does not enforce it, so here it is advisory");
+    "memory cap: none here: macOS refuses ulimit -d, so the 4 GiB asked for is not set");
+  assert.equal(memoryCapReport(524288, "win32"), "memory cap: none here: Windows refuses ulimit -d, so the 512 MiB asked for is not set");
   assert.match(memoryCapReport(null, "linux"), /^memory cap: none \(--memory-cap none\)/);
-  assert.match(usage(), /--memory-cap <size> +data cap \(ulimit -d\) of every test process.*default: 4G; none or 0 disables; not enforced on macOS/);
+  assert.match(usage(), /--memory-cap <size> +data cap \(ulimit -d\) of every test process.*default: 4G; none or 0 disables; not set on macOS or Windows/);
 });
 
 // Bounded on purpose: without the cap this allocates 1 GiB and passes, so a
@@ -548,7 +556,8 @@ test("a node that accepts the flag runs the tests under the bounded command",
   const dir = gitlessSandbox();
   const r = runIn(dir, sandboxCommand([], ["scripts/tests/git.test.mjs"], undefined, 2));
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /# pass 1/);
+  // TAP on Node 18 to 22 through a pipe, the spec reporter on Node 23 and later (TL-761).
+  assert.match(r.stdout.replace(/\x1b\[[0-9;]*m/g, ""), /^(# |ℹ )pass 1$/m);
 });
 
 // TL-674: Stryker's sandbox is a copy of the tree without `.git`, and a test
@@ -1152,7 +1161,7 @@ test("the run states its memory cap and names each mutant an allocation failure 
     };
     const r = await inProcess(["--files", "scripts/lib.mjs", "--concurrency", "1", "--memory-cap", "512M"], root, deps);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.err, /^memory cap: 512 MiB of data per test process \(ulimit -d\)/m);
+    assert.ok(r.err.split("\n").includes(memoryCapReport(524288)), "the run did not state the cap it was given: " + r.err);
     assert.deepEqual(r.out.split("\n").filter((l) => l.startsWith("hit the memory cap")),
       ["hit the memory cap  scripts/lib.mjs:1  ArrowFunction → () => undefined"]);
     assert.match(r.err, /1 mutant was killed by an allocation failure at the memory cap, not by an assertion/);
