@@ -14,7 +14,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import os, { hostname, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -82,7 +82,10 @@ function fixture() {
   sh(root, "git", ["add", "-A"]);
   sh(root, "git", ["commit", "-q", "-m", "base"]);
   sh(root, "git", ["switch", "-q", "-c", "feature"]);
-  return root;
+  // The real path: git and a child's cwd answer with it, and on macOS tmpdir()
+  // is a symlink to /private/var, so an unresolved root names the same
+  // directory by another string (TL-760).
+  return realpathSync(root);
 }
 
 function run(root, args) {
@@ -1910,7 +1913,8 @@ test("a failing git is named with its own words, outside a repository and for an
     assert.equal(r.code, 2, r.out + r.err);
     const err = r.err.replace(/\x1b\[[0-9;]*m/g, "").split("\n");
     assert.match(err[0], /^\S+ node scripts\/mutation-run\.mjs: not inside a git repository$/);
-    assert.match(err[1], /^  git rev-parse --show-toplevel: fatal: not a git repository/);
+    // git's own detail, in whatever language this machine's git speaks (TL-760).
+    assert.match(err[1], /^  git rev-parse --show-toplevel: fatal: \S/);
     assert.equal(err.length, 3, "git's own trailing newline reached the detail: " + JSON.stringify(err));
 
     const b = run(root, ["--base", "no-such-ref", "--plan"]);

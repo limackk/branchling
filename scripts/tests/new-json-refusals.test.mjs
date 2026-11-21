@@ -33,7 +33,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appendFileSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -362,7 +362,8 @@ test("without --json, the plan refused after the write names the file, each prob
 
   assert.deepEqual(r.stderr.split("\n"), [
     "branchling new: the task was written and the plan was NOT",
-    "  " + join(dir, "backlog", "tasks", written),
+    // The CLI resolves --dir from its cwd, a real path; on macOS tmpdir() is a symlink (TL-760).
+    "  " + join(realpathSync(dir), "backlog", "tasks", written),
     ...problems.map((p) => "  - " + p),
     "  " + schedule,
     "",

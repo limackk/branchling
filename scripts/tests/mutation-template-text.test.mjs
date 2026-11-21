@@ -22,10 +22,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { fixtureDir } from "./_fixture-dir.mjs";
-import { SCRIPTS_DIR, isolateHome, scriptSource } from "./_repo.mjs";
+import { SCRIPTS_DIR, isolateHome, plainOutput, scriptSource } from "./_repo.mjs";
 import { plan, templateTextLines } from "../mutation-run.mjs";
 
 isolateHome("mutation-template-text");
+// The refusals below are asserted as the text a person reads, so the run they
+// spawn is told it writes to no terminal, whatever colour CI forces (TL-760).
+plainOutput();
 const ENTRY = join(SCRIPTS_DIR, "mutation-run.mjs");
 
 function lineSet(source) {
