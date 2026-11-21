@@ -1972,7 +1972,7 @@ test("template text from ranges given out of order is merged in line order", () 
 // its report and the directory it all lives in — judged with a stand-in that
 // records what it was handed, so it is judged where Stryker is not installed.
 const FAKE_STRYKER = `
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname } from "node:path";
 const [, , verb, configPath] = process.argv;
@@ -1999,13 +1999,20 @@ if (mode === "obeys" || mode === "stubborn") {
   // records the SIGTERM it receives; under "obeys" Stryker ends on it and the
   // helper does not, under "stubborn" the other way round.
   const record = (name, exit) => "process.on('SIGTERM', () => { require('fs').writeFileSync('" + name + "', ''); "
-    + (exit ? "process.exit(0); " : "") + "}); setInterval(() => {}, 1000);";
+    + (exit ? "process.exit(0); " : "") + "}); require('fs').writeFileSync('helper-ready', ''); setInterval(() => {}, 1000);";
   const helper = spawn(process.execPath, ["-e", record("helper-termed", mode === "stubborn")], { stdio: "ignore" });
   if (mode === "stubborn") {
     for (const s of ["SIGTERM", "SIGINT"]) process.on(s, () => writeFileSync("stryker-termed", ""));
   }
-  // Written once the helper's handler can run, so a signal sent on seeing it is never early.
-  setTimeout(() => writeFileSync("sleeping.json", JSON.stringify({ work: dirname(configPath), helper: helper.pid, stryker: process.pid })), 300);
+  // Written once the helper SAYS its handler is installed, so a signal sent on
+  // seeing it is never early. A fixed 300 ms was a race: on a loaded Node 18
+  // runner the helper was still starting, and SIGTERM's default ended it with
+  // no record (TL-762).
+  const ready = setInterval(() => {
+    if (!existsSync("helper-ready")) return;
+    clearInterval(ready);
+    writeFileSync("sleeping.json", JSON.stringify({ work: dirname(configPath), helper: helper.pid, stryker: process.pid }));
+  }, 20);
   setInterval(() => {}, 1000);
 }
 process.stdout.write("progress text\\n");
@@ -2112,7 +2119,7 @@ test("a run terminated by a signal stops Stryker's group and removes its work di
     const cases = [["obeys", "SIGTERM", 143], ["obeys", "SIGINT", 130], ["stubborn", "SIGTERM", 143]];
     for (const [mode, signal, code] of cases) {
       const label = signal + " (Stryker " + mode + ")";
-      for (const f of ["sleeping.json", "helper-termed", "stryker-termed"]) rmSync(join(root, f), { force: true });
+      for (const f of ["sleeping.json", "helper-ready", "helper-termed", "stryker-termed"]) rmSync(join(root, f), { force: true });
       write(root, "mode.txt", mode);
       const probe = spawn(process.execPath, [join(root, "probe.mjs"), join(root, "fake-stryker.mjs")], { cwd: root });
       probes.push(probe);
