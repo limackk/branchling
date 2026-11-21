@@ -361,6 +361,20 @@ export const MUTEX_LIVE_HOLDER_MAX_MS = 300_000;
  *  nests them would otherwise wait for a lock it holds itself. */
 const INSIDE = new Set();
 
+/**
+ * Whether `e` is Windows refusing a name its holder has just unlinked (TL-765).
+ *
+ * A file unlinked while another process still has it open stays "delete
+ * pending" on Windows until the last handle closes, and every open or link of
+ * that name fails with EPERM meanwhile. For a mutex that is the release of the
+ * previous holder, still in progress: two writers contending on the Windows
+ * runner failed with it instead of waiting. On POSIX EPERM means what it says
+ * and is thrown.
+ */
+export function releasePending(e, platform = process.platform) {
+  return platform === "win32" && e && e.code === "EPERM";
+}
+
 /** Block without a timer: the callers are synchronous top to bottom, and an
  *  `await` in the middle of a critical section would be a different design. */
 function sleepSync(ms) {
@@ -482,7 +496,7 @@ export function pidAlive(pid, kill = process.kill.bind(process)) {
  *        of one file has to compute the same string for any of this to hold.
  * @param {Function} fn
  * @param {{env?: object, waitMs?: number, staleMs?: number, liveMaxMs?: number,
- *          now?: () => number, interleave?: (step: string) => void}} opts
+ *          now?: () => number, interleave?: (step: string) => void, platform?: string}} opts
  * @returns whatever `fn` returns
  * @throws {Error} with `code: "EBUSY"` when the wait ran out
  */
@@ -511,9 +525,17 @@ export function withMutex(name, fn, opts = {}) {
     // when the section is HELD, and a stamp taken before waiting made a holder
     // look up to `waitMs` older than it was.
     record.ts = new Date(now()).toISOString();
-    if (createExclusively(path, JSON.stringify(record) + "\n")) break;
-    interleave("contended");
-    const seen = readHolder(path);
+    let seen;
+    try {
+      if (createExclusively(path, JSON.stringify(record) + "\n")) break;
+      interleave("contended");
+      seen = readHolder(path);
+    } catch (e) {
+      // A release in progress, not a failure: wait for it like a holder.
+      if (!releasePending(e, opts.platform) || now() >= deadline) throw e;
+      sleepSync(5 + Math.floor(Math.random() * 10));
+      continue;
+    }
     // Released since the create failed: try again, and remove nothing.
     if (!seen) continue;
     const holder = seen.record;

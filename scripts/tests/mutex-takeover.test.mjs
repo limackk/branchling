@@ -196,3 +196,36 @@ test("a living holder past the ceiling is taken over, which bounds a reused pid"
   withMutex("past-ceiling", () => { entered = true; }, { env: ENV, waitMs: 200, liveMaxMs: 40_000 });
   assert.equal(entered, true, "a holder older than the ceiling kept the section");
 });
+
+// TL-765: on Windows a mutex its holder has just unlinked stays "delete
+// pending" while another process holds it open, and open or link of the name
+// fails with EPERM until then. The seam raises that EPERM at the point where
+// the create has failed, which is where the Windows runner met it.
+function deletePending() {
+  const e = new Error("EPERM: operation not permitted, open 'mutex'");
+  e.code = "EPERM";
+  return e;
+}
+
+test("on Windows an EPERM while the holder's release is pending is waited out, not thrown", () => {
+  const path = mutexPath("delete-pending");
+  writeFileSync(path, holderRecord("released", new Date(0).toISOString()), "utf8");
+  let raised = 0;
+  let entered = false;
+  withMutex("delete-pending", () => { entered = true; }, { env: ENV, waitMs: 2000, platform: "win32",
+    interleave: (step) => { if (step === "contended" && raised++ === 0) throw deletePending(); } });
+  assert.ok(entered, "the section was not entered once the release completed");
+  assert.equal(raised, 2, "the contended point was not reached again after the EPERM");
+});
+
+test("POSITIVE CONTROL: off Windows the same EPERM is thrown, and on Windows past the deadline too", () => {
+  const throwsEperm = (platform, waitMs) => {
+    const path = mutexPath("eperm-" + platform + "-" + waitMs);
+    writeFileSync(path, holderRecord("held"), "utf8");
+    assert.throws(() => withMutex("eperm-" + platform + "-" + waitMs, () => {}, { env: ENV, waitMs, platform,
+      interleave: (step) => { if (step === "contended") throw deletePending(); } }), (e) => e.code === "EPERM");
+    unlinkSync(path);
+  };
+  throwsEperm("linux", 2000);
+  throwsEperm("win32", 0);
+});
