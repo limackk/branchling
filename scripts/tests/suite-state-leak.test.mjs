@@ -37,6 +37,7 @@ import { tmpdir } from "node:os";
 import { basename, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { canonicalPath } from "../canonical-path.mjs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { SCRIPTS_DIR, isolateHome } from "./_repo.mjs";
 import { STATE_DIR_ENV, stateRoot } from "../lock.mjs";
@@ -52,6 +53,8 @@ const STATE_DIRNAME = basename(stateRoot({ XDG_STATE_HOME: "/x" }));
 function tmpRoots() {
   const roots = new Set([tmpdir()]);
   try { roots.add(realpathSync(tmpdir())); } catch { /* the plain spelling is still checked */ }
+  // The spelling a lock's origin is written in; on Windows it differs from both above (TL-768).
+  roots.add(canonicalPath(tmpdir()));
   return [...roots].map((r) => (r.endsWith(sep) ? r : r + sep));
 }
 

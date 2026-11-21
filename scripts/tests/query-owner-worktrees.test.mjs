@@ -17,10 +17,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { canonicalPath } from "../canonical-path.mjs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import { isolateHome, plainOutput, SCRIPTS_DIR } from "./_repo.mjs";
 import { ownerMatches } from "../task-select.mjs";
@@ -72,9 +73,10 @@ function clone() {
   const loops = [1, 2].map((n) => {
     const path = join(dir, "loop-" + n);
     vcs(repo, ["worktree", "add", "-q", "-b", "loop-" + n, path]);
-    return { path: realpathSync(path), backlog: join(path, "backlog") };
+    // The spelling the tool reports: realpathSync keeps 8.3 short names on Windows (TL-768).
+    return { path: canonicalPath(path), backlog: join(path, "backlog") };
   });
-  return { repo: realpathSync(repo), backlog, env, ids, loops };
+  return { repo: canonicalPath(repo), backlog, env, ids, loops };
 }
 
 /** What `take` leaves in a loop's tree: an uncommitted edit of the file. */

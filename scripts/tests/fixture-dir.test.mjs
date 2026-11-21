@@ -220,10 +220,14 @@ function leftBy(c) {
   return { rest: left.filter((n) => n !== leaks[0]), nested };
 }
 
+// TL-768: these hold only where another process can deliver a catchable signal.
+const SIGNALS_UNCATCHABLE = process.platform === "win32" && "Windows delivers no catchable signal to another process: kill() is TerminateProcess, SIGHUP is ENOSYS";
+const NO_ORPHANS = process.platform === "win32" && "on Windows a child dies with its killed runner, so no orphan meets EPIPE";
+
 // Spelled out, not imported from the helper: a list read from the code under
 // test would shrink together with it.
 for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) {
-  test("a test file stopped by " + signal + " leaves no fixture behind", async () => {
+  test("a test file stopped by " + signal + " leaves no fixture behind", { skip: SIGNALS_UNCATCHABLE }, async () => {
     const c = await startStoppable();
     assert.equal(c.added, 1, "the helper installed its SIGTERM listener " + c.added + " times");
     process.kill(c.filePid, signal);
@@ -233,7 +237,7 @@ for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) {
   });
 }
 
-test("a signal another listener handles is not raised a second time", async () => {
+test("a signal another listener handles is not raised a second time", { skip: SIGNALS_UNCATCHABLE }, async () => {
   const c = await startStoppable({
     extra: `process.on("SIGTERM", () => {
   writeFileSync(join(process.env.${PROBE_ENV}, "seen"), "x", { flag: "a" });
@@ -261,7 +265,7 @@ test("a test file killed by SIGKILL leaves ONE directory, and it names its pid",
   assert.deepEqual(nested.map((n) => n.replace(/-[^-]+$/, "")), ["branchling-nested"]);
 });
 
-test("a test file orphaned by a killed runner ends and leaves no fixture behind", async () => {
+test("a test file orphaned by a killed runner ends and leaves no fixture behind", { skip: NO_ORPHANS }, async () => {
   // The second test would keep a file that survived its EPIPE alive well past
   // the wait below.
   const c = await startStoppable({ waitMs: 1_000, thenMs: 120_000 });
@@ -272,7 +276,7 @@ test("a test file orphaned by a killed runner ends and leaves no fixture behind"
   assert.deepEqual({ rest, nested }, { rest: [], nested: [] }, "left behind by a test file whose runner was killed");
 });
 
-test("an EPIPE somebody else handles leaves the fixtures in place", async () => {
+test("an EPIPE somebody else handles leaves the fixtures in place", { skip: NO_ORPHANS }, async () => {
   // Registered after the helper's own listener, so it runs only if the helper
   // let the error go on, and it reports whether the fixture was still there.
   const c = await startStoppable({

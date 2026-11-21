@@ -93,7 +93,8 @@ test("a directory that is not a backlog is refused in the command's own kind", (
   assert.match(text.stderr, new RegExp(PRODUCT_NAME + " jira-proof --dir <path>"));
 });
 
-test("an error that is not a backlog refusal propagates instead of being answered as one", () => {
+test("an error that is not a backlog refusal propagates instead of being answered as one",
+  { skip: process.platform === "win32" && "Windows cannot remove a running process's working directory (TL-768)" }, () => {
   // `resolveBacklogDir` reads the working directory before any source, and a
   // removed working directory makes that read throw ENOENT: a failure of the
   // process, not a verdict about a directory. Answering it as "no backlog"

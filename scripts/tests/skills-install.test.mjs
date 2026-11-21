@@ -410,7 +410,9 @@ function linkInPlace(fx, dir, to) {
   const path = installed(fx, dir);
   rmSync(path, { recursive: true, force: true });
   mkdirSync(dirname(path), { recursive: true });
-  symlinkSync(to, path);
+  // A directory link: Windows makes a file link to a target that does not exist
+  // yet, and stat through it fails with EPERM once it does (TL-768).
+  symlinkSync(to, path, "dir");
   return path;
 }
 
@@ -585,7 +587,7 @@ for (const at of [".claude", ".claude/skills"]) {
     const path = join(fx.dir, at);
     const away = join(fx.dir, "moved-away");
     mkdirSync(dirname(path), { recursive: true });
-    symlinkSync(away, path);
+    symlinkSync(away, path, "dir");
     const refused = installSkills(fx.dir, opts);
     assert.equal(refused.kind, "target-not-directory");
     assert.ok(refused.message.startsWith(path + " is not a directory"), refused.message);

@@ -1,0 +1,3 @@
+{"id":"01M7Z88VQEQDS6GMY103VBQYV3","ts":"2026-11-21T14:30:54.446Z","task":"TL-768","field":"__created__","from":"","to":"The Windows job no longer fails tests that assumed POSIX","actor":"agent:claude","source":"new","reason":"unknown"}
+{"id":"01M7Z893QFF0V0GF6BK8KFE9G8","ts":"2026-11-21T14:31:02.639Z","task":"TL-768","field":"status","from":"pending","to":"in_progress","actor":"agent:claude","source":"take","reason":"unknown"}
+{"id":"01M7Z893QFWCHHEBE7SR0TYDZ2","ts":"2026-11-21T14:31:02.639Z","task":"TL-768","field":"owner","from":"unassigned","to":"agent:claude","actor":"agent:claude","source":"take","reason":"unknown"}

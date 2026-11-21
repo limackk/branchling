@@ -14,11 +14,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { fixtureDir } from "./_fixture-dir.mjs";
 import os, { hostname, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { canonicalPath } from "../canonical-path.mjs";
 
 import { REPO_ROOT, SCRIPTS_DIR, isolateHome, isolateState, scriptSource, sourceRoot } from "./_repo.mjs";
 import {
@@ -31,6 +33,11 @@ import {
 } from "../mutation-slot.mjs";
 import { STATE_DIR_ENV } from "../lock.mjs";
 import { containedGroupProbe } from "./_git.mjs";
+
+// A run executes POSIX shell, process groups and `ps`; Stryker's command runner
+// is cmd.exe on Windows, so there the run cannot work at all (TL-767). The tests
+// that execute that machinery are skipped there (TL-768); its logic is not.
+const POSIX_RUN = process.platform === "win32" && "a mutation run executes POSIX shell, process groups and ps (TL-767)";
 
 const HOME = isolateHome("mutation-run");
 // Every run spawned here, and the slot holders below, use a throwaway slot,
@@ -367,7 +374,9 @@ test("Stryker is started without the active mutant or the test context of a run 
   const above = { PATH: "/bin", HOME: "/h", NODE_TEST_CONTEXT: "child-v8", __STRYKER_ACTIVE_MUTANT__: "0" };
   assert.deepEqual(strykerEnv(above), { PATH: "/bin", HOME: "/h" });
   assert.equal(above.__STRYKER_ACTIVE_MUTANT__, "0", "the caller's environment was changed, not copied");
-  assert.equal(strykerEnv().PATH, process.env.PATH, "without an argument it is this process's environment");
+  // Spelled `Path` on Windows, and process.env is case-insensitive only there (TL-768).
+  const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH");
+  assert.equal(strykerEnv()[pathKey], process.env[pathKey], "without an argument it is this process's environment");
 });
 
 // TL-653. A test that reads a module's source text must find it as written,
@@ -552,7 +561,7 @@ test("a mutant killed by an allocation failure is named apart from those an asse
 });
 
 test("a node that accepts the flag runs the tests under the bounded command",
-  { skip: testFileConcurrency({ cores: 32 }) === null && "this node has no --test-concurrency" }, () => {
+  { skip: POSIX_RUN || (testFileConcurrency({ cores: 32 }) === null && "this node has no --test-concurrency") }, () => {
   const dir = gitlessSandbox();
   const r = runIn(dir, sandboxCommand([], ["scripts/tests/git.test.mjs"], undefined, 2));
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -590,20 +599,20 @@ function runIn(dir, cmd, env = process.env) {
   return spawnSync("sh", ["-c", cmd], { cwd: dir, encoding: "utf8", env: clean, timeout: 60_000 });
 }
 
-test("a test asking git about its own tree passes in a sandbox copied without .git", () => {
+test("a test asking git about its own tree passes in a sandbox copied without .git", { skip: POSIX_RUN }, () => {
   const dir = gitlessSandbox();
   const r = runIn(dir, sandboxCommand([], ["scripts/tests/git.test.mjs"]));
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
 
-test("POSITIVE CONTROL: without the init step the same test fails in that sandbox", () => {
+test("POSITIVE CONTROL: without the init step the same test fails in that sandbox", { skip: POSIX_RUN }, () => {
   const dir = gitlessSandbox();
   const withoutInit = sandboxCommand([], ["scripts/tests/git.test.mjs"]).slice((SANDBOX_GIT_INIT + " && ").length);
   const r = runIn(dir, withoutInit);
   assert.notEqual(r.status, 0, "the fixture is inside a repository, so it cannot tell the step's absence apart");
 });
 
-test("a sandbox that already is a repository is not initialised again", () => {
+test("a sandbox that already is a repository is not initialised again", { skip: POSIX_RUN }, () => {
   const dir = gitlessSandbox();
   sh(dir, "git", ["init", "-q"]);
   sh(dir, "git", ["-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"]);
@@ -863,7 +872,7 @@ test("when the cgroup leaves exactly what the machine has free, the machine is n
 
 test("the slot is one file per machine, in the state directory, under a name runs of other versions agree on", () => {
   // Not keyed by repository: two clones share the memory as much as two worktrees do.
-  assert.equal(slotPath({ [STATE_DIR_ENV]: "/state" }), join("/state", "mutation", "slot.lock"));
+  assert.equal(slotPath({ [STATE_DIR_ENV]: "/state" }), join(resolve("/state"), "mutation", "slot.lock"));
   assert.equal(SLOT_TOKEN_ENV, "MUTATION_SLOT_TOKEN", "a nested run of another version would no longer recognise its holder");
   assert.equal(describeHolder({ pid: 7, host: "h", ts: "T", tree: "/r" }, "/s/slot.lock"),
     "pid 7 on h since T, run from /r (/s/slot.lock)");
@@ -1080,11 +1089,14 @@ test("a mutation run refuses with --no-wait, and otherwise waits naming the hold
       assert.doesNotMatch(err, /^concurrency /m, "the waiting run went on to choose its workers");
     } finally {
       waiting.kill("SIGKILL");
+      // Gone before the fixture is removed: Windows will not remove a running
+      // process's working directory, and that EBUSY hid this test's own result (TL-768).
+      if (waiting.exitCode === null && waiting.signalCode === null) await new Promise((done) => waiting.once("exit", done));
     }
     assert.equal(JSON.parse(readFileSync(slotPath({ [STATE_DIR_ENV]: STATE }), "utf8")).pid, pid);
   } finally {
     holder.child.kill("SIGKILL");
-    rmSync(root, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true, maxRetries: 10 });
   }
 });
 
@@ -1839,7 +1851,8 @@ test("a text run names each survivor, the lines it mutated, what it killed after
     assert.ok(err.some((l) => / 2 mutants timed out and are counted as detected; rerun with a lower --concurrency before trusting the score$/.test(l)), r.err);
     assert.equal(seen.length, 1);
     assert.equal(seen[0].opts.concurrency, 3, "Stryker was not handed the concurrency the run chose");
-    assert.equal(seen[0].root, root);
+    // git spells the root with forward slashes and long names on Windows (TL-768).
+    assert.equal(canonicalPath(seen[0].root), canonicalPath(root));
     assert.deepEqual(seen[0].p.mutate, ["scripts/lib.mjs:1-1"]);
     assert.equal(typeof seen[0].slot.token, "string", "Stryker was not handed the slot it runs under");
 
@@ -1907,7 +1920,8 @@ test("only scripts/ and bin/ modules that exist are mutated, never a look-alike 
     write(root, "scripts/lib.mjs.orig", "export const lib = () => 0;\n");
     write(root, "bin/tool.mjs", "export const t = 1;\n");
     write(root, "scripts/tests/tool.test.mjs", 'const s = "tool.mjs example.mjs lib.mjs.orig dangling.mjs";\n');
-    sh(root, "ln", ["-s", "nowhere.mjs", join(root, "scripts", "dangling.mjs")]);
+    // Node, not `ln -s`: MSYS ln refuses a link to nothing (TL-768).
+    symlinkSync("nowhere.mjs", join(root, "scripts", "dangling.mjs"));
     assert.deepEqual(planOf(root).modules, ["bin/tool.mjs"]);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -2038,9 +2052,10 @@ test("Stryker is handed its configuration, an environment of its own and the slo
     assert.deepEqual(r, { code: 0, leftovers: [], kept: null, report: { files: { "scripts/lib.mjs": { mutants: [] } } } });
     const seen = JSON.parse(readFileSync(join(root, "seen.json"), "utf8"));
     assert.equal(seen.verb, "run");
-    assert.equal(seen.cwd, root);
+    assert.equal(canonicalPath(seen.cwd), canonicalPath(root));
     assert.equal(seen.configPath, join(dirname(seen.configPath), "stryker.config.json"));
-    assert.match(dirname(seen.configPath), new RegExp("^" + tmpdir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "/mutation-run-"));
+    assert.equal(dirname(dirname(seen.configPath)), tmpdir());
+    assert.match(basename(dirname(seen.configPath)), /^mutation-run-/);
     assert.equal(seen.config.jsonReporter.fileName, join(dirname(seen.configPath), "mutation.json"));
     assert.equal(seen.config.tempDirName, join(dirname(seen.configPath), "sandbox"));
     assert.deepEqual(seen.config.mutate, ["scripts/lib.mjs"]);
@@ -2098,7 +2113,7 @@ test("Stryker is handed its configuration, an environment of its own and the slo
 
 // TL-713. A run cut off by `timeout` or Ctrl-C used to die inside spawnSync
 // with its work directory, a sandbox copy of the repository, left behind.
-test("a run terminated by a signal stops Stryker's group and removes its work directory", async () => {
+test("a run terminated by a signal stops Stryker's group and removes its work directory", { skip: POSIX_RUN }, async () => {
   const root = fixture();
   const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
   const settle = async (check, ms = 10000) => {
@@ -2223,7 +2238,7 @@ test("a git that cannot be started fails with the command that failed, and no in
 test("an untracked link to nothing has no changed line", () => {
   const root = fixture();
   try {
-    sh(root, "ln", ["-s", "nowhere.mjs", join(root, "scripts", "dangling.mjs")]);
+    symlinkSync("nowhere.mjs", join(root, "scripts", "dangling.mjs"));
     assert.deepEqual(changedLineRanges(root, "main", ["scripts/dangling.mjs"]), {});
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -2345,7 +2360,7 @@ test("timing the tests discards what they print, however much", () => {
   }
 });
 
-test("only links to directories are recreated, never inside node_modules or .git", () => {
+test("only links to directories are recreated, never inside node_modules or .git", { skip: POSIX_RUN }, () => {
   const root = fixtureDir(join(tmpdir(), "branchling-test-mutation-links-"));
   try {
     write(root, "real/f.txt", "x\n");
@@ -2394,7 +2409,8 @@ test("the sweeper's own group is found by its own pid, whatever that pid is", ()
   assert.deepEqual(calls, [[7, "SIGKILL"]], "the sweeper's own group was killed whole");
 });
 
-test("on Windows the sweep lists nothing and kills nothing", () => {
+// Simulates win32 on POSIX; its positive control lists processes with POSIX ps.
+test("on Windows the sweep lists nothing and kills nothing", { skip: POSIX_RUN }, () => {
   const marker = join(tmpdir(), "mutation-run-win32probe-" + process.pid) + "/";
   const sleeper = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)", marker], { stdio: "ignore" });
   const saved = Object.getOwnPropertyDescriptor(process, "platform");
@@ -2411,7 +2427,7 @@ test("on Windows the sweep lists nothing and kills nothing", () => {
   assert.deepEqual(calls, []);
 });
 
-test("a ps that fails is named with its own words, and one that cannot start with the reason", () => {
+test("a ps that fails is named with its own words, and one that cannot start with the reason", { skip: POSIX_RUN }, () => {
   const dir = fixtureDir(join(tmpdir(), "branchling-test-mutation-ps-"));
   try {
     write(dir, "probe.mjs", "import { leftoverProcesses } from " + JSON.stringify(pathToFileURL(ENTRY).href) + ";\n"
