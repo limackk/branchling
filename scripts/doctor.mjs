@@ -107,9 +107,18 @@ function ownCommand(args, note) {
   return { [OWN_COMMAND]: { args, note: note || "" } };
 }
 
+/**
+ * The characters a word may hold and still be pasted bare. On Windows the
+ * shells a fix is pasted into, PowerShell and cmd, read `\` and `~` literally,
+ * and a path such as `C:\Users\RUNNER~1\…` (an 8.3 short name) is an
+ * ordinary word there; the POSIX quotes put around it were not quotes to cmd
+ * at all, so the printed fix named a directory that does not exist (TL-763).
+ */
+const BARE_WORD = { posix: /^[A-Za-z0-9_\/.:=@%+,-]+$/, win32: /^[A-Za-z0-9_\/\\.:=@%+,~-]+$/ };
+
 /** A path as one shell word, so a printed fix can be pasted as it stands. */
-function shellWord(s) {
-  return /^[A-Za-z0-9_\/.:=@%+,-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'";
+export function shellWord(s, platform = process.platform) {
+  return BARE_WORD[platform === "win32" ? "win32" : "posix"].test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
 function ownText({ args, note }, dir) {

@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { isolateHome } from "./_repo.mjs";
 import { followRepair } from "./_follow-repair.mjs";
-import { checkSkill, checkTemplate, templateFields } from "../doctor.mjs";
+import { checkSkill, checkTemplate, shellWord, templateFields } from "../doctor.mjs";
 import { HOOK_NAME, COMMIT_MESSAGE_HOOK_NAME, hookBlock, hooksTarget } from "../hooks-command.mjs";
 import { BLOCK_OPEN } from "../git-rules.mjs";
 import { canonicalPath } from "../canonical-path.mjs";
@@ -344,6 +344,20 @@ test("a --dir that needs quoting is printed as one shell word", () => {
   // The shell reads it back as the one path doctor was given.
   const r = spawnSync("sh", ["-c", "printf '%s' " + fix.split(" --dir ")[1].split("   #")[0]], { encoding: "utf8" });
   assert.equal(r.stdout, dir);
+});
+
+// TL-763: on Windows every --dir was printed inside POSIX quotes, which cmd
+// does not read as quotes, because `\` and the `~` of an 8.3 name are not in
+// the POSIX set of bare characters.
+test("a Windows path is one bare word on Windows and a quoted one elsewhere", () => {
+  const short = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\backlog";
+  assert.equal(shellWord(short, "win32"), short);
+  assert.equal(shellWord("D:/a/branchling/backlog", "win32"), "D:/a/branchling/backlog");
+  // POSITIVE CONTROL: the same word needs quoting for a POSIX shell, where `\` escapes.
+  assert.equal(shellWord(short, "linux"), "'" + short + "'");
+  assert.equal(shellWord("/tmp/x/backlog", "linux"), "/tmp/x/backlog");
+  assert.equal(shellWord("it's", "win32"), "'it'\\''s'", "a word outside both sets is still quoted");
+  assert.equal(shellWord(short), shellWord(short, process.platform), "without a platform, this one's");
 });
 
 test("a template without a closed frontmatter is reported as not checked, not as missing every field", () => {
